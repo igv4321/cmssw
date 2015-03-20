@@ -15,7 +15,7 @@
 //
 //
 
-#include <iostream>
+#include <string>
 
 // system include files
 #include <memory>
@@ -48,6 +48,7 @@ class HBHENoiseFilterResultProducer : public edm::EDProducer {
 
       // parameters
       edm::EDGetTokenT<HcalNoiseSummary> noisetoken_;
+      std::string resultLabel_;
       double minRatio_, maxRatio_;
       int minHPDHits_, minRBXHits_, minHPDNoOtherHits_;
       int minZeros_;
@@ -76,6 +77,7 @@ HBHENoiseFilterResultProducer::HBHENoiseFilterResultProducer(const edm::Paramete
 {
   //now do what ever initialization is needed
   noisetoken_ = consumes<HcalNoiseSummary>(iConfig.getParameter<edm::InputTag>("noiselabel"));
+  resultLabel_ = iConfig.getParameter<std::string>("resultLabel");
   minRatio_ = iConfig.getParameter<double>("minRatio");
   maxRatio_ = iConfig.getParameter<double>("maxRatio");
   minHPDHits_ = iConfig.getParameter<int>("minHPDHits");
@@ -98,7 +100,7 @@ HBHENoiseFilterResultProducer::HBHENoiseFilterResultProducer(const edm::Paramete
   maxjetindex_ = iConfig.getParameter<int>("maxjetindex");
   maxNHF_ = iConfig.getParameter<double>("maxNHF");
 
-  produces<bool>("HBHENoiseFilterResult");
+  produces<bool>(resultLabel_.c_str());
 }
 
 
@@ -125,9 +127,7 @@ HBHENoiseFilterResultProducer::produce(edm::Event& iEvent, const edm::EventSetup
     throw edm::Exception(edm::errors::ProductNotFound) << " could not find HcalNoiseSummary.\n";
     return;
   }
-  const HcalNoiseSummary summary = *summary_h;
-
-  bool result=true; // stores overall filter result
+  const HcalNoiseSummary& summary = *summary_h;
 
   bool goodJetFoundInLowBVRegion=false; // checks whether a jet is in a low BV region, where false noise flagging rate is higher.
 
@@ -162,27 +162,24 @@ HBHENoiseFilterResultProducer::produce(edm::Event& iEvent, const edm::EventSetup
 	}
     } // if (IgnoreTS4TS5ifJetInLowBVRegion_==true)
 
-  if(summary.minE2Over10TS()<minRatio_) result=false;
-  if(summary.maxE2Over10TS()>maxRatio_) result=false;
-  if(summary.maxHPDHits()>=minHPDHits_) result=false;
-  if(summary.maxRBXHits()>=minRBXHits_) result=false;
-  if(summary.maxHPDNoOtherHits()>=minHPDNoOtherHits_) result=false;
-  if(summary.maxZeros()>=minZeros_) result=false;
-  if(summary.min25GeVHitTime()<minHighEHitTime_) result=false;
-  if(summary.max25GeVHitTime()>maxHighEHitTime_) result=false;
-  if(summary.minRBXEMF()<maxRBXEMF_) result=false;
-  if(summary.numIsolatedNoiseChannels()>=minNumIsolatedNoiseChannels_) result=false;
-  if(summary.isolatedNoiseSumE()>=minIsolatedNoiseSumE_) result=false;
-  if(summary.isolatedNoiseSumEt()>=minIsolatedNoiseSumEt_) result=false;
-  if(useTS4TS5_ && summary.HasBadRBXTS4TS5() == true && !goodJetFoundInLowBVRegion) result = false;
-  if(useRBXRechitR45Loose_ && summary.HasBadRBXRechitR45Loose() == true && !goodJetFoundInLowBVRegion) result = false;
-  if(useRBXRechitR45Tight_ && summary.HasBadRBXRechitR45Tight() == true && !goodJetFoundInLowBVRegion) result = false;
+  const bool fail = (summary.minE2Over10TS()<minRatio_) ||
+      (summary.maxE2Over10TS()>maxRatio_) ||
+      (summary.maxHPDHits()>=minHPDHits_) ||
+      (summary.maxRBXHits()>=minRBXHits_) ||
+      (summary.maxHPDNoOtherHits()>=minHPDNoOtherHits_) ||
+      (summary.maxZeros()>=minZeros_) ||
+      (summary.min25GeVHitTime()<minHighEHitTime_) ||
+      (summary.max25GeVHitTime()>maxHighEHitTime_) ||
+      (summary.minRBXEMF()<maxRBXEMF_) ||
+      (summary.numIsolatedNoiseChannels()>=minNumIsolatedNoiseChannels_) ||
+      (summary.isolatedNoiseSumE()>=minIsolatedNoiseSumE_) ||
+      (summary.isolatedNoiseSumEt()>=minIsolatedNoiseSumEt_) ||
+      (useTS4TS5_ && summary.HasBadRBXTS4TS5() == true && !goodJetFoundInLowBVRegion) ||
+      (useRBXRechitR45Loose_ && summary.HasBadRBXRechitR45Loose() == true && !goodJetFoundInLowBVRegion) ||
+      (useRBXRechitR45Tight_ && summary.HasBadRBXRechitR45Tight() == true && !goodJetFoundInLowBVRegion);
 
-  std::auto_ptr<bool> pOut(new bool);
-  *pOut=result;
-
-  iEvent.put(pOut, "HBHENoiseFilterResult");
-  return;
+  std::auto_ptr<bool> pOut(new bool(!fail));
+  iEvent.put(pOut, resultLabel_.c_str());
 }
 
 //define this as a plug-in

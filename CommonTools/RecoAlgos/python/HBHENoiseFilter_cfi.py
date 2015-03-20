@@ -22,4 +22,8 @@ HBHENoiseFilter = cms.EDFilter(
     jetlabel = cms.InputTag('ak4PFJets'),
     maxjetindex = cms.int32(0), # maximum jet index that will be checked for 'IgnoreTS4TS5ifJetInLowBVRegion'
     maxNHF = cms.double(0.9) # maximum allowed jet->neutralHadronEnergyFraction()
-    )
+)
+
+from Configuration.StandardSequences.Eras import eras
+
+eras.run2_common.toModify(HBHENoiseFilter, IgnoreTS4TS5ifJetInLowBVRegion=cms.bool(False))

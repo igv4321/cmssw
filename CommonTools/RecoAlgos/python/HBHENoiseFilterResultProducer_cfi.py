@@ -3,6 +3,7 @@ import FWCore.ParameterSet.Config as cms
 HBHENoiseFilterResultProducer = cms.EDProducer(
     'HBHENoiseFilterResultProducer',
     noiselabel = cms.InputTag('hcalnoise'),
+    resultLabel = cms.string('HBHENoiseFilterResult'),
     minRatio = cms.double(-999),
     maxRatio = cms.double(999),
     minHPDHits = cms.int32(17),
@@ -22,4 +23,8 @@ HBHENoiseFilterResultProducer = cms.EDProducer(
     jetlabel = cms.InputTag('ak4PFJets'),
     maxjetindex = cms.int32(0), # maximum jet index that will be checked for 'IgnoreTS4TS5ifJetInLowBVRegion'
     maxNHF = cms.double(0.9) # maximum allowed jet->neutralHadronEnergyFraction() for a jet in low BV region to be considered 'good' (and thus skip the noise check)
-    )
+)
+
+from Configuration.StandardSequences.Eras import eras
+
+eras.run2_common.toModify(HBHENoiseFilterResultProducer, IgnoreTS4TS5ifJetInLowBVRegion=cms.bool(False))

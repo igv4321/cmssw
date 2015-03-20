@@ -565,54 +565,54 @@ HcalNoiseInfoProducer::fillrechits(edm::Event& iEvent, const edm::EventSetup& iS
 
     // do some rechit counting and energies
     summary.rechitCount_ = summary.rechitCount_ + 1;
-    summary.rechitEnergy_ = summary.rechitEnergy_ + rechit.energy();
+    summary.rechitEnergy_ = summary.rechitEnergy_ + rechit.eraw();
     if ((dbStatusFlag & (1 <<HcalChannelStatus::HcalBadLaserSignal))==1) // hit comes from a region where no laser calibration pulse is normally seen
       {
 	++summary.hitsInNonLaserRegion_;
-	summary.energyInNonLaserRegion_+=rechit.energy();
+	summary.energyInNonLaserRegion_+=rechit.eraw();
       }
     else // hit comes from region where laser calibration pulse is seen
       {
 	++summary.hitsInLaserRegion_;
-	summary.energyInLaserRegion_+=rechit.energy();
+	summary.energyInLaserRegion_+=rechit.eraw();
       }
 
-    if(rechit.energy() > 1.5)
+    if(rechit.eraw() > 1.5)
     {
       summary.rechitCount15_ = summary.rechitCount15_ + 1;
-      summary.rechitEnergy15_ = summary.rechitEnergy15_ + rechit.energy();
+      summary.rechitEnergy15_ = summary.rechitEnergy15_ + rechit.eraw();
     }
 
     // if it was ID'd as isolated noise, update the summary object
     if(rechit.flags() & isolbitset) {
       summary.nisolnoise_++;
-      summary.isolnoisee_ += rechit.energy();
+      summary.isolnoisee_ += rechit.eraw();
       GlobalPoint gp = geo->getPosition(rechit.id());
-      double et = rechit.energy()*gp.perp()/gp.mag();
+      double et = rechit.eraw()*gp.perp()/gp.mag();
       summary.isolnoiseet_ += et;
     }
 
     if(rechit.flags() & flatbitset) {
       summary.nflatnoise_++;
-      summary.flatnoisee_ += rechit.energy();
+      summary.flatnoisee_ += rechit.eraw();
       GlobalPoint gp = geo->getPosition(rechit.id());
-      double et = rechit.energy()*gp.perp()/gp.mag();
+      double et = rechit.eraw()*gp.perp()/gp.mag();
       summary.flatnoiseet_ += et;
     }
 
     if(rechit.flags() & spikebitset) {
       summary.nspikenoise_++;
-      summary.spikenoisee_ += rechit.energy();
+      summary.spikenoisee_ += rechit.eraw();
       GlobalPoint gp = geo->getPosition(rechit.id());
-      double et = rechit.energy()*gp.perp()/gp.mag();
+      double et = rechit.eraw()*gp.perp()/gp.mag();
       summary.spikenoiseet_ += et;
     }
 
     if(rechit.flags() & trianglebitset) {
       summary.ntrianglenoise_++;
-      summary.trianglenoisee_ += rechit.energy();
+      summary.trianglenoisee_ += rechit.eraw();
       GlobalPoint gp = geo->getPosition(rechit.id());
-      double et = rechit.energy()*gp.perp()/gp.mag();
+      double et = rechit.eraw()*gp.perp()/gp.mag();
       summary.trianglenoiseet_ += et;
     }
 
@@ -620,18 +620,18 @@ HcalNoiseInfoProducer::fillrechits(edm::Event& iEvent, const edm::EventSetup& iS
       if ((dbStatusFlag & (1 <<HcalChannelStatus::HcalCellExcludeFromHBHENoiseSummaryR45))==0)  // only add to TS4TS5 if the bit is not marked as "HcalCellExcludeFromHBHENoiseSummaryR45"
 	{
 	  summary.nts4ts5noise_++;
-	  summary.ts4ts5noisee_ += rechit.energy();
+	  summary.ts4ts5noisee_ += rechit.eraw();
 	  GlobalPoint gp = geo->getPosition(rechit.id());
-	  double et = rechit.energy()*gp.perp()/gp.mag();
+	  double et = rechit.eraw()*gp.perp()/gp.mag();
 	  summary.ts4ts5noiseet_ += et;
 	}
     }
     
     if(rechit.flags() & negativebitset) {
 	  summary.nnegativenoise_++;
-	  summary.negativenoisee_ += rechit.energy();
+	  summary.negativenoisee_ += rechit.eraw();
 	  GlobalPoint gp = geo->getPosition(rechit.id());
-	  double et = rechit.energy()*gp.perp()/gp.mag();
+	  double et = rechit.eraw()*gp.perp()/gp.mag();
 	  summary.negativenoiseet_ += et;
     }
 

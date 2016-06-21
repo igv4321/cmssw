@@ -18,6 +18,9 @@
    <class name="HFPreRecHit" ClassVersion="3">
     <version ClassVersion="3" checksum="224636588"/>
    </class>
+   <class name="HBHEChannelInfo" ClassVersion="3">
+    <version ClassVersion="3" checksum="4008748091"/>
+   </class>
    <class name="HFRecHit" ClassVersion="14">
     <version ClassVersion="14" checksum="3957655113"/>
     <version ClassVersion="13" checksum="1446699820"/>

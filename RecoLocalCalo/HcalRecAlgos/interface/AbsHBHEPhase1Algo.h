@@ -50,7 +50,7 @@ public:
     virtual HBHERecHit reconstruct(const HBHEChannelInfo& info,
                                    const HcalRecoParam* params,
                                    const HcalCalibrations& calibs,
-                                   const bool isRealData) = 0;
+                                   bool isRealData) = 0;
 };
 
 #endif // RecoLocalCalo_HcalRecAlgos_AbsHBHEPhase1Algo_h_

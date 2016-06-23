@@ -50,18 +50,33 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     const double fc_ampl = info.chargeInWindow(ibeg, ibeg + samplesToAdd_);
     const bool applyContainment = params ? params->correctForPhaseContainment() : true;
     const float phasens = params ? params->correctionPhaseNS() : phaseNS_;
-    const float m0E = m0Energy(info, fc_ampl, applyContainment, phasens, isData);
+    float m0E = m0Energy(info, fc_ampl, applyContainment, phasens);
+    m0E *= hbminusCorrectionFactor(info.id(), m0E, isData);
     const float m0T = m0Time(info, fc_ampl, calibs);
     rh = HBHERecHit(info.id(), m0E, m0T);
 
     return rh;
 }
 
+float SimpleHBHEPhase1Algo::hbminusCorrectionFactor(const HcalDetId& cell,
+                                                    const float energy,
+                                                    const bool isRealData) const
+{
+    float corr = 1.f;
+    if (isRealData && runnum_ > 0)
+        if (cell.subdet() == HcalBarrel)
+        {
+            const int ieta = cell.ieta();
+            const int iphi = cell.iphi();
+            corr = hbminus_special_ecorr(ieta, iphi, energy, runnum_);
+        }
+    return corr;
+}
+
 float SimpleHBHEPhase1Algo::m0Energy(const HBHEChannelInfo& info,
                                      const double fc_ampl,
                                      const bool applyContainmentCorrection,
-                                     const double phaseNs,
-                                     const bool isData)
+                                     const double phaseNs)
 {
     int ibeg = static_cast<int>(info.soi()) + firstSampleShift_;
     if (ibeg < 0)
@@ -69,26 +84,10 @@ float SimpleHBHEPhase1Algo::m0Energy(const HBHEChannelInfo& info,
     double e = info.energyInWindow(ibeg, ibeg + samplesToAdd_);
 
     // Pulse containment correction
-    {
+    {    
         double corrFactor = 1.0;
         if (applyContainmentCorrection)
             corrFactor = pulseCorr_.get(info.id(), samplesToAdd_, phaseNs)->getCorrection(fc_ampl);
-        e *= corrFactor;
-    }
-
-    // Special HB- correction
-    {
-        double corrFactor = 1.0;
-        if (isData && runnum_ > 0)
-        {
-            const HcalDetId& cell = info.id();
-            if (cell.subdet() == HcalBarrel)
-            {
-                const int ieta = cell.ieta();
-                const int iphi = cell.iphi();
-                corrFactor = hbminus_special_ecorr(ieta, iphi, e, runnum_);
-            }
-        }
         e *= corrFactor;
     }
 

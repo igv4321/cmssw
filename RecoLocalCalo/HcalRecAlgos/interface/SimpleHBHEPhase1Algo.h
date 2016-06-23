@@ -39,19 +39,24 @@ public:
     virtual HBHERecHit reconstruct(const HBHEChannelInfo& info,
                                    const HcalRecoParam* params,
                                    const HcalCalibrations& calibs,
-                                   const bool isRealData) override;
+                                   bool isRealData) override;
     // Basic accessors
     inline int getFirstSampleShift() const {return firstSampleShift_;}
     inline int getSamplesToAdd() const {return samplesToAdd_;}
     inline float getPhaseNS() const {return phaseNS_;}
     inline int getRunNumber() const {return runnum_;}
 
+    // Special HB- correction
+    float hbminusCorrectionFactor(const HcalDetId& cell,
+                                  float energy, bool isRealData) const;
+
     // "Method 0" rechit energy. Calls a non-const member of
     // HcalPulseContainmentManager, so no const qualifier here.
+    // HB- correction is not applied inside this function.
     float m0Energy(const HBHEChannelInfo& info,
                    double reconstructedCharge,
                    bool applyContainmentCorrection,
-                   double phaseNS, bool isData);
+                   double phaseNS);
 
     // "Method 0" rechit timing (original low-pileup QIE8 algorithm)
     float m0Time(const HBHEChannelInfo& info,

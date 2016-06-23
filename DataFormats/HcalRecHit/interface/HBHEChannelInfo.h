@@ -1,6 +1,8 @@
 #ifndef DataFormats_HcalRecHit_HBHEChannelInfo_h_
 #define DataFormats_HcalRecHit_HBHEChannelInfo_h_
 
+#include <cfloat>
+
 #include "DataFormats/HcalDetId/interface/HcalDetId.h"
 // #include "DataFormats/HcalRecHit/interface/HFQIE10Info.h"
 
@@ -114,6 +116,39 @@ public:
         for (unsigned i=begin; i<imax; ++i)
             sum += charge_[i]*gain_[i];
         return sum;
+    }
+
+    // The two following methods return MAXSAMPLES if the specified
+    // window does not overlap with the samples stored
+    inline unsigned peakChargeTS(const unsigned begin, const unsigned end) const
+    {
+        unsigned iPeak = MAXSAMPLES;
+        double dmax = -DBL_MAX;
+        const unsigned imax = end < nSamples_ ? end : nSamples_;
+        for (unsigned i=begin; i<imax; ++i)
+            if (charge_[i] > dmax)
+            {
+                dmax = charge_[i];
+                iPeak = i;
+            }
+        return iPeak;
+    }
+
+    inline unsigned peakEnergyTS(const unsigned begin, const unsigned end) const
+    {
+        unsigned iPeak = MAXSAMPLES;
+        double dmax = -DBL_MAX;
+        const unsigned imax = end < nSamples_ ? end : nSamples_;
+        for (unsigned i=begin; i<imax; ++i)
+        {
+            const double e = charge_[i]*gain_[i];
+            if (e > dmax)
+            {
+                dmax = e;
+                iPeak = i;
+            }
+        }
+        return iPeak;
     }
 
 private:

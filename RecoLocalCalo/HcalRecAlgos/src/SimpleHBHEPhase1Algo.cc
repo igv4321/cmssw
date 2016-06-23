@@ -42,8 +42,9 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     if (ibeg < 0)
         ibeg = 0;
     const double fc_ampl = info.chargeInWindow(ibeg, ibeg + samplesToAdd_);
+    const bool applyContainment = params ? params->correctForPhaseContainment() : true;
     const float phasens = params ? params->correctionPhaseNS() : phaseNS_;
-    const float m0E = m0Energy(info, fc_ampl, phasens);
+    const float m0E = m0Energy(info, fc_ampl, applyContainment, phasens);
     const float m0T = m0Time(info, fc_ampl, calibs);
     rh = HBHERecHit(info.id(), m0E, m0T);
 
@@ -52,15 +53,17 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
 
 float SimpleHBHEPhase1Algo::m0Energy(const HBHEChannelInfo& info,
                                      const double fc_ampl,
-                                     const double phaseNS)
+                                     const bool applyContainmentCorrection,
+                                     const double phaseNs)
 {
-    const HcalPulseContainmentCorrection* corr = pulseCorr_.get(
-        info.id(), samplesToAdd_, phaseNS);
     int ibeg = static_cast<int>(info.soi()) + firstSampleShift_;
     if (ibeg < 0)
         ibeg = 0;
-    return info.energyInWindow(ibeg, ibeg + samplesToAdd_)*
-           corr->getCorrection(fc_ampl);
+    const double e = info.energyInWindow(ibeg, ibeg + samplesToAdd_);
+    double corrFactor = 1.0;
+    if (applyContainmentCorrection)
+        corrFactor = pulseCorr_.get(info.id(), samplesToAdd_, phaseNs)->getCorrection(fc_ampl);
+    return e*corrFactor;
 }
 
 float SimpleHBHEPhase1Algo::m0Time(const HBHEChannelInfo& info,

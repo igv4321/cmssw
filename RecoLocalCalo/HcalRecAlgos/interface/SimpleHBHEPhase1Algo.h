@@ -42,7 +42,9 @@ public:
     // "Method 0" rechit energy. Calls a non-const member of
     // HcalPulseContainmentManager, so no const qualifier here.
     float m0Energy(const HBHEChannelInfo& info,
-                   double reconstructedCharge, double phaseNS);
+                   double reconstructedCharge,
+                   bool applyContainmentCorrection,
+                   double phaseNS);
 
     // "Method 0" rechit timing (original low-pileup QIE8 algorithm)
     float m0Time(const HBHEChannelInfo& info,

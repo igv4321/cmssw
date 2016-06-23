@@ -21,11 +21,11 @@ public:
     // Special value for the rise time used in case the QIE11 pulse
     // is always above the discriminator
     // static constexpr float UNKNOWN_T_OVERSHOOT = HFQIE10Info::UNKNOWN_T_OVERSHOOT;
-    static constexpr float UNKNOWN_T_OVERSHOOT = -101.f;
+    static constexpr float UNKNOWN_T_OVERSHOOT = -110.f;
 
     // Special value for the rise time that can be used in case the TDC
     // info is not available at all (as for QIE8)
-    static constexpr float UNKNOWN_T_NOTDC = -110.f;
+    static constexpr float UNKNOWN_T_NOTDC = -120.f;
 
 
     inline HBHEChannelInfo()
@@ -60,6 +60,9 @@ public:
         hasLinkError_ = linkError;
         hasCapidError_ = capidError;
     }
+
+    inline void tagAsDropped()
+        {dropped_ = true;}
 
     // For speed, the "setSample" function does not perform bounds checking
     inline void setSample(const unsigned ts, const uint8_t rawADC,

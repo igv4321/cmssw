@@ -97,8 +97,8 @@ namespace {
     // The following function should apply the SiPM nonlinearity
     // correction. It may need extra arguments for that.
     double getHBHEChargeFromSample(const QIE11DataFrame::Sample& s,
-                                  const double decodedCharge,
-                                  const HcalCalibrations& calib)
+                                   const double decodedCharge,
+                                   const HcalCalibrations& calib)
     {
         // FIX THIS!!!
         return decodedCharge - calib.pedestal(s.capid());
@@ -187,12 +187,14 @@ private:
     bool saveDroppedInfos_;
     bool makeRecHits_;
     bool dropZSmarkedPassed_;
+    bool tsFromDB_;
 
     // Other members
     edm::EDGetTokenT<HBHEDigiCollection> tok_hb_;
     edm::EDGetTokenT<QIE11DigiCollection> tok_he_;
     std::unique_ptr<AbsHBHEPhase1Algo> reco_;
     std::unique_ptr<AbsHFPhase1AlgoData> recoConfig_;
+    std::unique_ptr<HcalRecoParams> paramTS_;
 
     // For the function below, arguments "infoColl" and/or "rechits"
     // are allowed to be null.
@@ -217,6 +219,7 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
       saveDroppedInfos_(conf.getParameter<bool>("saveDroppedInfos")),
       makeRecHits_(conf.getParameter<bool>("makeRecHits")),
       dropZSmarkedPassed_(conf.getParameter<bool>("dropZSmarkedPassed")),
+      tsFromDB_(conf.getParameter<bool>("tsFromDB")),
       reco_(parseHBHEPhase1AlgoDescription(conf.getParameter<edm::ParameterSet>("algorithm")))
 {
     // Check that the reco algorithm has been successfully configured
@@ -262,8 +265,10 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
                                           HBHEChannelInfoCollection* infos,
                                           HBHERecHitCollection* rechits)
 {
-    // If "saveDroppedInfos_" is set, fill the info with something
-    // meaningful even if the database tells us to drop this channel
+    // If "saveDroppedInfos_" flag is set, fill the info with something
+    // meaningful even if the database tells us to drop this channel.
+    // Note that this flag affects only "infos", the rechits are still
+    // not going to be constructed from such channels.
     const bool skipDroppedChannels = !(infos && saveDroppedInfos_);
 
     // Iterate over the input collection
@@ -296,13 +301,18 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
         // ADC to fC conversion
         CaloSamples cs;
         coder.adc2fC(frame, cs);
-        const unsigned nRead = cs.size();
-        const unsigned maxTS = std::min(nRead, HBHEChannelInfo::MAXSAMPLES);
-        const unsigned soi = frame.presamples();
+        const int nRead = cs.size();
+        const int maxTS = std::min(nRead, static_cast<int>(HBHEChannelInfo::MAXSAMPLES));
+        int soi = frame.presamples();
+        if (tsFromDB_)
+        {
+            const HcalRecoParam* param_ts = paramTS_->getValues(cell.rawId());
+            soi = param_ts->firstSample();
+        }
         int soiCapid = 4;
 
         // Go over time slices and fill the samples
-        for (unsigned ts=0; ts<maxTS; ++ts)
+        for (int ts=0; ts<maxTS; ++ts)
         {
             auto s(frame[ts]);
             const double charge = getHBHEChargeFromSample(s, cs[ts], calib);
@@ -339,6 +349,14 @@ void
 HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetup)
 {
     using namespace edm;
+
+    // Get the Hcal topology if needed
+    ESHandle<HcalTopology> htopo;
+    if (tsFromDB_)
+    {
+        eventSetup.get<HcalRecNumberingRecord>().get(htopo);
+        paramTS_->setTopo(htopo.product());
+    }
 
     // Fetch the calibrations
     ESHandle<HcalDbService> conditions;
@@ -381,7 +399,7 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
         out->reserve(maxOutputSize);
     }
 
-    // Iterate over the input collections
+    // Process the input collections, filling the output ones
     if (processHB_)
     {
         HBHEChannelInfo channelInfo(false);
@@ -407,6 +425,13 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
 void
 HBHEPhase1Reconstructor::beginRun(edm::Run const&, edm::EventSetup const& es)
 {
+    if (tsFromDB_)
+    {
+        edm::ESHandle<HcalRecoParams> p;
+        es.get<HcalRecoParamsRcd>().get(p);
+        paramTS_ = std::make_unique<HcalRecoParams>(*p.product());
+    }
+
     if (reco_->isConfigurable())
     {
         recoConfig_ = fetchHBHEPhase1AlgoData(algoConfigClass_, es);
@@ -441,6 +466,7 @@ HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& descri
     desc.add<bool>("saveDroppedInfos");
     desc.add<bool>("makeRecHits");
     desc.add<bool>("dropZSmarkedPassed");
+    desc.add<bool>("tsFromDB");
 
     add_param_set(algorithm);
     

@@ -88,7 +88,10 @@ namespace {
 
         if (className == "SimpleHBHEPhase1Algo")
         {
-            algo = std::unique_ptr<AbsHBHEPhase1Algo>(new SimpleHBHEPhase1Algo());
+            algo = std::unique_ptr<AbsHBHEPhase1Algo>(
+                new SimpleHBHEPhase1Algo(ps.getParameter<int>("firstSampleShift"),
+                                         ps.getParameter<int>("samplesToAdd")
+            ));
         }
 
         return algo;

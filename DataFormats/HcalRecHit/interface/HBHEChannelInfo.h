@@ -68,16 +68,10 @@ public:
     inline void setSample(const unsigned ts, const uint8_t rawADC,
                           const double q, const double g,
                           const float t = UNKNOWN_T_NOTDC)
-        {charge_[ts] = q; gain_[ts] = g, riseTime_[ts] = t; adc_[ts] = rawADC;}
+        {charge_[ts] = q; gain_[ts] = g; riseTime_[ts] = t; adc_[ts] = rawADC;}
 
     // Inspectors
     inline HcalDetId id() const {return id_;}
-
-    inline const double* charge() const {return charge_;}
-    inline const double* gain() const {return gain_;}
-    inline const uint8_t* adc() const {return adc_;}
-    inline const float* riseTime() const
-        {if (hasTimeInfo_) return riseTime_; else return nullptr;}
 
     inline unsigned nSamples() const {return nSamples_;}
     inline unsigned soi() const {return soi_;}
@@ -86,6 +80,22 @@ public:
     inline bool isDropped() const {return dropped_;}
     inline bool hasLinkError() const {return hasLinkError_;}
     inline bool hasCapidError() const {return hasCapidError_;}
+
+    // Access to time slice arrays
+    inline const double* charge() const {return charge_;}
+    inline const double* gain() const {return gain_;}
+    inline const uint8_t* adc() const {return adc_;}
+    inline const float* riseTime() const
+        {if (hasTimeInfo_) return riseTime_; else return nullptr;}
+
+    // Indexed access to time slice quiantities. No bounds checking.
+    inline double tsCharge(const unsigned ts) const {return charge_[ts];}
+    inline double tsEnergy(const unsigned ts) const
+        {return charge_[ts]*gain_[ts];}
+    inline double tsGain(const unsigned ts) const {return gain_[ts];}
+    inline uint8_t tsAdc(const unsigned ts) const {return adc_[ts];}
+    inline float tsRiseTime(const unsigned ts) const
+        {return hasTimeInfo_ ? riseTime_[ts] : UNKNOWN_T_NOTDC;}
 
     // The TS with the "end" index is not included in the window
     inline double chargeInWindow(const unsigned begin, const unsigned end) const

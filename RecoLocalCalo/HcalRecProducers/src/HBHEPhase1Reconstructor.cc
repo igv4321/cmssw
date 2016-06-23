@@ -301,6 +301,8 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
         // ADC to fC conversion
         CaloSamples cs;
         coder.adc2fC(frame, cs);
+
+        // Prepare to iterate over time slices
         const int nRead = cs.size();
         const int maxTS = std::min(nRead, static_cast<int>(HBHEChannelInfo::MAXSAMPLES));
         int soi = frame.presamples();
@@ -312,7 +314,7 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
         int soiCapid = 4;
 
         // Go over time slices and fill the samples
-        for (int ts=0; ts<maxTS; ++ts)
+        for (int ts = 0; ts < maxTS; ++ts)
         {
             auto s(frame[ts]);
             const double charge = getHBHEChargeFromSample(s, cs[ts], calib);

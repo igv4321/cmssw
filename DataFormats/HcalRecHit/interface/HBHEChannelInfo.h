@@ -53,7 +53,7 @@ public:
                                const bool dropThisChannel)
     {
         id_ = detId;
-        nSamples_ = nSamp;
+        nSamples_ = nSamp < MAXSAMPLES ? nSamp : MAXSAMPLES;
         soi_ = iSoi;
         capid_ = iCapid;
         dropped_ = dropThisChannel;
@@ -101,7 +101,8 @@ public:
     inline double chargeInWindow(const unsigned begin, const unsigned end) const
     {
         double sum = 0.0;
-        for (unsigned i=begin; i<end && i<nSamples_; ++i)
+        const unsigned imax = end < nSamples_ ? end : nSamples_;
+        for (unsigned i=begin; i<imax; ++i)
             sum += charge_[i];
         return sum;
     }
@@ -109,7 +110,8 @@ public:
     inline double energyInWindow(const unsigned begin, const unsigned end) const
     {
         double sum = 0.0;
-        for (unsigned i=begin; i<end && i<nSamples_; ++i)
+        const unsigned imax = end < nSamples_ ? end : nSamples_;
+        for (unsigned i=begin; i<imax; ++i)
             sum += charge_[i]*gain_[i];
         return sum;
     }

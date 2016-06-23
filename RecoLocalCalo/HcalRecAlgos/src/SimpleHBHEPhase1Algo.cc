@@ -38,7 +38,8 @@ void SimpleHBHEPhase1Algo::endRun()
 
 HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
                                              const HcalRecoParam* params,
-                                             const HcalCalibrations& calibs)
+                                             const HcalCalibrations& calibs,
+                                             const bool isData)
 {
     HBHERecHit rh;
 
@@ -49,7 +50,7 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     const double fc_ampl = info.chargeInWindow(ibeg, ibeg + samplesToAdd_);
     const bool applyContainment = params ? params->correctForPhaseContainment() : true;
     const float phasens = params ? params->correctionPhaseNS() : phaseNS_;
-    const float m0E = m0Energy(info, fc_ampl, applyContainment, phasens);
+    const float m0E = m0Energy(info, fc_ampl, applyContainment, phasens, isData);
     const float m0T = m0Time(info, fc_ampl, calibs);
     rh = HBHERecHit(info.id(), m0E, m0T);
 
@@ -59,7 +60,8 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
 float SimpleHBHEPhase1Algo::m0Energy(const HBHEChannelInfo& info,
                                      const double fc_ampl,
                                      const bool applyContainmentCorrection,
-                                     const double phaseNs)
+                                     const double phaseNs,
+                                     const bool isData)
 {
     int ibeg = static_cast<int>(info.soi()) + firstSampleShift_;
     if (ibeg < 0)
@@ -77,7 +79,7 @@ float SimpleHBHEPhase1Algo::m0Energy(const HBHEChannelInfo& info,
     // Special HB- correction
     {
         double corrFactor = 1.0;
-        if (runnum_ > 0)
+        if (isData && runnum_ > 0)
         {
             const HcalDetId& cell = info.id();
             if (cell.subdet() == HcalBarrel)

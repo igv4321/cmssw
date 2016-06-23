@@ -30,6 +30,7 @@ public:
 
     inline virtual ~SimpleHBHEPhase1Algo() {}
 
+    // Methods to override from the base class
     virtual void beginRun(const edm::Run&, const edm::EventSetup&) override;
     virtual void endRun() override;
 
@@ -37,8 +38,8 @@ public:
 
     virtual HBHERecHit reconstruct(const HBHEChannelInfo& info,
                                    const HcalRecoParam* params,
-                                   const HcalCalibrations& calibs) override;
-
+                                   const HcalCalibrations& calibs,
+                                   const bool isRealData) override;
     // Basic accessors
     inline int getFirstSampleShift() const {return firstSampleShift_;}
     inline int getSamplesToAdd() const {return samplesToAdd_;}
@@ -50,7 +51,7 @@ public:
     float m0Energy(const HBHEChannelInfo& info,
                    double reconstructedCharge,
                    bool applyContainmentCorrection,
-                   double phaseNS);
+                   double phaseNS, bool isData);
 
     // "Method 0" rechit timing (original low-pileup QIE8 algorithm)
     float m0Time(const HBHEChannelInfo& info,

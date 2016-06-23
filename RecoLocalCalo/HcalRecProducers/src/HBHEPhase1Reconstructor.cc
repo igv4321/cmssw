@@ -209,6 +209,7 @@ private:
                      const HcalDbService& cond,
                      const HcalChannelQuality& qual,
                      const HcalSeverityLevelComputer& severity,
+                     const bool isRealData,
                      HBHEChannelInfo* info,
                      HBHEChannelInfoCollection* infoColl,
                      HBHERecHitCollection* rechits);
@@ -268,6 +269,7 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
                                           const HcalDbService& cond,
                                           const HcalChannelQuality& qual,
                                           const HcalSeverityLevelComputer& severity,
+                                          const bool isRealData,
                                           HBHEChannelInfo* channelInfo,
                                           HBHEChannelInfoCollection* infos,
                                           HBHERecHitCollection* rechits)
@@ -347,7 +349,8 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
             const HcalRecoParam* pptr = nullptr;
             if (recoParamsFromDB_)
                 pptr = param_ts;
-            const HBHERecHit& rh = reco_->reconstruct(*channelInfo, pptr, calib);
+            const HBHERecHit& rh = reco_->reconstruct(
+                *channelInfo, pptr, calib, isRealData);
             if (rh.id().rawId())
                 rechits->push_back(rh);
         }
@@ -410,18 +413,19 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
     }
 
     // Process the input collections, filling the output ones
+    const bool isData = e.isRealData();
     if (processHB_)
     {
         HBHEChannelInfo channelInfo(false);
         processData<HBHEDataFrame>(*hbDigis, *conditions, *p, *mycomputer,
-                                   &channelInfo, infos.get(), out.get());
+                                   isData, &channelInfo, infos.get(), out.get());
     }
 
     if (processHE_)
     {
         HBHEChannelInfo channelInfo(true);
         processData<QIE11DataFrame>(*heDigis, *conditions, *p, *mycomputer,
-                                    &channelInfo, infos.get(), out.get());
+                                    isData, &channelInfo, infos.get(), out.get());
     }
 
     // Add the output collections to the event record

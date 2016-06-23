@@ -39,6 +39,11 @@ public:
                                    const HcalRecoParam* params,
                                    const HcalCalibrations& calibs) override;
 
+    // Basic accessors
+    inline int getFirstSampleShift() const {return firstSampleShift_;}
+    inline int getSamplesToAdd() const {return samplesToAdd_;}
+    inline float getPhaseNS() const {return phaseNS_;}
+
     // "Method 0" rechit energy. Calls a non-const member of
     // HcalPulseContainmentManager, so no const qualifier here.
     float m0Energy(const HBHEChannelInfo& info,
@@ -50,9 +55,6 @@ public:
     float m0Time(const HBHEChannelInfo& info,
                  double reconstructedCharge,
                  const HcalCalibrations& calibs) const;
-
-    inline float defaultPhaseNS() const {return phaseNS_;}
-
 private:
     HcalPulseContainmentManager pulseCorr_;
 

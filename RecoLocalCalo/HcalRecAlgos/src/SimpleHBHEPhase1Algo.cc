@@ -5,6 +5,8 @@
 #include "RecoLocalCalo/HcalRecAlgos/interface/SimpleHBHEPhase1Algo.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/timeshift_ns_hbheho.h"
 
+#include "FWCore/Framework/interface/Run.h"
+
 
 // Maximum fractional error for calculating Method 0
 // pulse containment correction
@@ -17,12 +19,15 @@ SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(const int firstSampleShift,
     : pulseCorr_(PulseContainmentFractionalError),
       firstSampleShift_(firstSampleShift),
       samplesToAdd_(samplesToAdd),
-      phaseNS_(phaseNS)
+      phaseNS_(phaseNS),
+      runnum_(0)
 {
 }
 
-void SimpleHBHEPhase1Algo::beginRun(const edm::EventSetup& es)
+void SimpleHBHEPhase1Algo::beginRun(const edm::Run& r,
+                                    const edm::EventSetup& es)
 {
+    runnum_ = r.run();
     pulseCorr_.beginRun(es);
 }
 
@@ -59,11 +64,33 @@ float SimpleHBHEPhase1Algo::m0Energy(const HBHEChannelInfo& info,
     int ibeg = static_cast<int>(info.soi()) + firstSampleShift_;
     if (ibeg < 0)
         ibeg = 0;
-    const double e = info.energyInWindow(ibeg, ibeg + samplesToAdd_);
-    double corrFactor = 1.0;
-    if (applyContainmentCorrection)
-        corrFactor = pulseCorr_.get(info.id(), samplesToAdd_, phaseNs)->getCorrection(fc_ampl);
-    return e*corrFactor;
+    double e = info.energyInWindow(ibeg, ibeg + samplesToAdd_);
+
+    // Pulse containment correction
+    {
+        double corrFactor = 1.0;
+        if (applyContainmentCorrection)
+            corrFactor = pulseCorr_.get(info.id(), samplesToAdd_, phaseNs)->getCorrection(fc_ampl);
+        e *= corrFactor;
+    }
+
+    // Special HB- correction
+    {
+        double corrFactor = 1.0;
+        if (runnum_ > 0)
+        {
+            const HcalDetId& cell = info.id();
+            if (cell.subdet() == HcalBarrel)
+            {
+                const int ieta = cell.ieta();
+                const int iphi = cell.iphi();
+                corrFactor = hbminus_special_ecorr(ieta, iphi, e, runnum_);
+            }
+        }
+        e *= corrFactor;
+    }
+
+    return e;
 }
 
 float SimpleHBHEPhase1Algo::m0Time(const HBHEChannelInfo& info,

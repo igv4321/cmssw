@@ -433,7 +433,7 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
 
 // ------------ method called when starting to processes a run  ------------
 void
-HBHEPhase1Reconstructor::beginRun(edm::Run const&, edm::EventSetup const& es)
+HBHEPhase1Reconstructor::beginRun(edm::Run const& r, edm::EventSetup const& es)
 {
     if (tsFromDB_ || recoParamsFromDB_)
     {
@@ -455,7 +455,7 @@ HBHEPhase1Reconstructor::beginRun(edm::Run const&, edm::EventSetup const& es)
                 << std::endl;
     }
 
-    reco_->beginRun(es);
+    reco_->beginRun(r, es);
 }
 
 void

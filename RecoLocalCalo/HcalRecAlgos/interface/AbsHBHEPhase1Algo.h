@@ -29,7 +29,7 @@ class AbsHBHEPhase1Algo
 public:
     inline virtual ~AbsHBHEPhase1Algo() {}
 
-    inline virtual void beginRun(const edm::EventSetup&) {}
+    inline virtual void beginRun(const edm::Run&, const edm::EventSetup&) {}
     inline virtual void endRun() {}
 
     // Does this class expect to receive its configuration from the database?

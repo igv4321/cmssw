@@ -30,7 +30,7 @@ public:
 
     inline virtual ~SimpleHBHEPhase1Algo() {}
 
-    virtual void beginRun(const edm::EventSetup&) override;
+    virtual void beginRun(const edm::Run&, const edm::EventSetup&) override;
     virtual void endRun() override;
 
     inline virtual bool isConfigurable() const override {return false;}
@@ -61,6 +61,7 @@ private:
     int firstSampleShift_;
     int samplesToAdd_;
     float phaseNS_;
+    int runnum_;
 };
 
 #endif // RecoLocalCalo_HcalRecAlgos_SimpleHBHEPhase1Algo_h_

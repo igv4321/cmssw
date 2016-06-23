@@ -43,6 +43,7 @@ public:
     inline int getFirstSampleShift() const {return firstSampleShift_;}
     inline int getSamplesToAdd() const {return samplesToAdd_;}
     inline float getPhaseNS() const {return phaseNS_;}
+    inline int getRunNumber() const {return runnum_;}
 
     // "Method 0" rechit energy. Calls a non-const member of
     // HcalPulseContainmentManager, so no const qualifier here.

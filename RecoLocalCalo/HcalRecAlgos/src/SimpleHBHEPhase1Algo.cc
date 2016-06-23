@@ -5,21 +5,66 @@
 #include "RecoLocalCalo/HcalRecAlgos/interface/SimpleHBHEPhase1Algo.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/timeshift_ns_hbheho.h"
 
+
+// Maximum fractional error for calculating Method 0
+// pulse containment correction
+constexpr float PulseContainmentFractionalError = 0.002f;
+
+
 SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(const int firstSampleShift,
-                                           const int samplesToAdd)
-    : firstSampleShift_(firstSampleShift),
-      samplesToAdd_(samplesToAdd)
+                                           const int samplesToAdd,
+                                           const float phaseNS)
+    : pulseCorr_(PulseContainmentFractionalError),
+      firstSampleShift_(firstSampleShift),
+      samplesToAdd_(samplesToAdd),
+      phaseNS_(phaseNS)
 {
+}
+
+void SimpleHBHEPhase1Algo::beginRun(const edm::EventSetup& es)
+{
+    pulseCorr_.beginRun(es);
+}
+
+void SimpleHBHEPhase1Algo::endRun()
+{
+    pulseCorr_.endRun();
 }
 
 HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
+                                             const HcalRecoParam* params,
                                              const HcalCalibrations& calibs)
 {
     HBHERecHit rh;
+
+    // Calculate "method 0" quantities
+    int ibeg = static_cast<int>(info.soi()) + firstSampleShift_;
+    if (ibeg < 0)
+        ibeg = 0;
+    const double fc_ampl = info.chargeInWindow(ibeg, ibeg + samplesToAdd_);
+    const float phasens = params ? params->correctionPhaseNS() : phaseNS_;
+    const float m0E = m0Energy(info, fc_ampl, phasens);
+    const float m0T = m0Time(info, fc_ampl, calibs);
+    rh = HBHERecHit(info.id(), m0E, m0T);
+
     return rh;
 }
 
+float SimpleHBHEPhase1Algo::m0Energy(const HBHEChannelInfo& info,
+                                     const double fc_ampl,
+                                     const double phaseNS)
+{
+    const HcalPulseContainmentCorrection* corr = pulseCorr_.get(
+        info.id(), samplesToAdd_, phaseNS);
+    int ibeg = static_cast<int>(info.soi()) + firstSampleShift_;
+    if (ibeg < 0)
+        ibeg = 0;
+    return info.energyInWindow(ibeg, ibeg + samplesToAdd_)*
+           corr->getCorrection(fc_ampl);
+}
+
 float SimpleHBHEPhase1Algo::m0Time(const HBHEChannelInfo& info,
+                                   const double fc_ampl,
                                    const HcalCalibrations& calibs) const
 {
     float time = -9999.f; // historic value
@@ -56,9 +101,8 @@ float SimpleHBHEPhase1Algo::m0Time(const HBHEChannelInfo& info,
             time = (maxI - soi)*25.f + timeshift_ns_hbheho(wpksamp);
 
             // Legacy QIE8 timing correction
-            const double fc_ampl = info.chargeInWindow(ibeg, iend);
-            time -= HcalTimeSlew::delay(std::max(1.0, fc_ampl), HcalTimeSlew::Medium);
-
+            time -= HcalTimeSlew::delay(std::max(1.0, fc_ampl),
+                                        HcalTimeSlew::Medium);
             // Time calibration
             time -= calibs.timecorr();
         }

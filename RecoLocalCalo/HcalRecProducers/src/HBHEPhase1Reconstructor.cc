@@ -90,8 +90,9 @@ namespace {
         {
             algo = std::unique_ptr<AbsHBHEPhase1Algo>(
                 new SimpleHBHEPhase1Algo(ps.getParameter<int>("firstSampleShift"),
-                                         ps.getParameter<int>("samplesToAdd")
-            ));
+                                         ps.getParameter<int>("samplesToAdd"),
+                                         ps.getParameter<double>("phaseNS")
+                ));
         }
 
         return algo;
@@ -180,6 +181,7 @@ public:
 
 private:
     virtual void beginRun(edm::Run const&, edm::EventSetup const&) override;
+    virtual void endRun(edm::Run const&, edm::EventSetup const&) override;
     virtual void produce(edm::Event&, const edm::EventSetup&) override;
 
     // Configuration parameters
@@ -191,6 +193,7 @@ private:
     bool makeRecHits_;
     bool dropZSmarkedPassed_;
     bool tsFromDB_;
+    bool recoParamsFromDB_;
 
     // Other members
     edm::EDGetTokenT<HBHEDigiCollection> tok_hb_;
@@ -223,6 +226,7 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
       makeRecHits_(conf.getParameter<bool>("makeRecHits")),
       dropZSmarkedPassed_(conf.getParameter<bool>("dropZSmarkedPassed")),
       tsFromDB_(conf.getParameter<bool>("tsFromDB")),
+      recoParamsFromDB_(conf.getParameter<bool>("recoParamsFromDB")),
       reco_(parseHBHEPhase1AlgoDescription(conf.getParameter<edm::ParameterSet>("algorithm")))
 {
     // Check that the reco algorithm has been successfully configured
@@ -279,9 +283,12 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
          it != coll.end(); ++it)
     {
         const DFrame& frame(*it);
+        const HcalDetId cell(frame.id());
+        const HcalRecoParam* param_ts = nullptr;
+        if (tsFromDB_ || recoParamsFromDB_)
+            param_ts = paramTS_->getValues(cell.rawId());
 
         // Check if the database tells us to drop this channel
-        const HcalDetId cell(frame.id());
         const HcalChannelStatus* mydigistatus = qual.getValues(cell.rawId());
         const bool taggedBadByDb = severity.dropChannel(mydigistatus->getValue());
         if (taggedBadByDb && skipDroppedChannels)
@@ -308,12 +315,7 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
         // Prepare to iterate over time slices
         const int nRead = cs.size();
         const int maxTS = std::min(nRead, static_cast<int>(HBHEChannelInfo::MAXSAMPLES));
-        int soi = frame.presamples();
-        if (tsFromDB_)
-        {
-            const HcalRecoParam* param_ts = paramTS_->getValues(cell.rawId());
-            soi = param_ts->firstSample();
-        }
+        const int soi = tsFromDB_ ? param_ts->firstSample() : frame.presamples();
         int soiCapid = 4;
 
         // Go over time slices and fill the samples
@@ -342,7 +344,10 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
         // Reconstruct the rechit
         if (rechits && makeThisRechit)
         {
-            const HBHERecHit& rh = reco_->reconstruct(*channelInfo, calib);
+            const HcalRecoParam* pptr = nullptr;
+            if (recoParamsFromDB_)
+                pptr = param_ts;
+            const HBHERecHit& rh = reco_->reconstruct(*channelInfo, pptr, calib);
             if (rh.id().rawId())
                 rechits->push_back(rh);
         }
@@ -430,7 +435,7 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
 void
 HBHEPhase1Reconstructor::beginRun(edm::Run const&, edm::EventSetup const& es)
 {
-    if (tsFromDB_)
+    if (tsFromDB_ || recoParamsFromDB_)
     {
         edm::ESHandle<HcalRecoParams> p;
         es.get<HcalRecoParamsRcd>().get(p);
@@ -449,9 +454,17 @@ HBHEPhase1Reconstructor::beginRun(edm::Run const&, edm::EventSetup const& es)
                 << "Failed to configure HBHEPhase1Algo algorithm from EventSetup"
                 << std::endl;
     }
+
+    reco_->beginRun(es);
 }
 
-#define add_param_set(name) /**/ \
+void
+HBHEPhase1Reconstructor::endRun(edm::Run const&, edm::EventSetup const&)
+{
+    reco_->endRun();
+}
+
+#define add_param_set(name) /**/       \
     edm::ParameterSetDescription name; \
     name.setAllowAnything(); \
     desc.add<edm::ParameterSetDescription>(#name, name)
@@ -472,6 +485,7 @@ HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& descri
     desc.add<bool>("makeRecHits");
     desc.add<bool>("dropZSmarkedPassed");
     desc.add<bool>("tsFromDB");
+    desc.add<bool>("recoParamsFromDB");
 
     add_param_set(algorithm);
     

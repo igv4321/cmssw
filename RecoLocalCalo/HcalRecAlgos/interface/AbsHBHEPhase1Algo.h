@@ -1,9 +1,11 @@
 #ifndef RecoLocalCalo_HcalRecAlgos_AbsHBHEPhase1Algo_h_
 #define RecoLocalCalo_HcalRecAlgos_AbsHBHEPhase1Algo_h_
 
+#include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "DataFormats/HcalRecHit/interface/HBHERecHit.h"
 #include "DataFormats/HcalRecHit/interface/HBHEChannelInfo.h"
 #include "CalibFormats/HcalObjects/interface/HcalCalibrations.h"
+#include "CondFormats/HcalObjects/interface/HcalRecoParam.h"
 
 class AbsHFPhase1AlgoData;
 
@@ -27,6 +29,9 @@ class AbsHBHEPhase1Algo
 public:
     inline virtual ~AbsHBHEPhase1Algo() {}
 
+    inline virtual void beginRun(const edm::EventSetup&) {}
+    inline virtual void endRun() {}
+
     // Does this class expect to receive its configuration from the database?
     virtual bool isConfigurable() const = 0;
 
@@ -39,7 +44,11 @@ public:
     // Convention: if we do not want to use the given channel at
     // all (i.e., it is to be discarded), the returned HBHERecHit
     // should have its id (of type HcalDetId) set to 0.
+    //
+    // Note that "params" pointer is allowed to be null.
+    //
     virtual HBHERecHit reconstruct(const HBHEChannelInfo& info,
+                                   const HcalRecoParam* params,
                                    const HcalCalibrations& calibs) = 0;
 };
 

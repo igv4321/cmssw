@@ -42,13 +42,14 @@
 
 #include "CalibFormats/CaloObjects/interface/CaloSamples.h"
 
-#include "CondFormats/HcalObjects/interface/AbsHFPhase1AlgoData.h"
-
 #include "RecoLocalCalo/HcalRecAlgos/interface/HcalSeverityLevelComputer.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/HcalSeverityLevelComputerRcd.h"
 
-// Phase 1 HB/HE reco algorithms
-#include "RecoLocalCalo/HcalRecAlgos/interface/SimpleHBHEPhase1Algo.h"
+// Base class for Phase 1 HB/HE reco algorithms configuration objects
+#include "CondFormats/HcalObjects/interface/AbsHFPhase1AlgoData.h"
+
+// Parser for Phase 1 HB/HE reco algorithms
+#include "RecoLocalCalo/HcalRecAlgos/interface/parseHBHEPhase1AlgoDescription.h"
 
 // Some helper functions
 namespace {
@@ -75,27 +76,6 @@ namespace {
         // else if (className == "OtherHFPhase1AlgoData")
         //     ...;
         return std::unique_ptr<AbsHFPhase1AlgoData>(data);
-    }
-
-    // Factory function for creating objects of types
-    // inheriting from AbsHBHEPhase1Algo out of parameter sets
-    std::unique_ptr<AbsHBHEPhase1Algo>
-    parseHBHEPhase1AlgoDescription(const edm::ParameterSet& ps)
-    {
-        std::unique_ptr<AbsHBHEPhase1Algo> algo;
-
-        const std::string& className = ps.getParameter<std::string>("Class");
-
-        if (className == "SimpleHBHEPhase1Algo")
-        {
-            algo = std::unique_ptr<AbsHBHEPhase1Algo>(
-                new SimpleHBHEPhase1Algo(ps.getParameter<int>("firstSampleShift"),
-                                         ps.getParameter<int>("samplesToAdd"),
-                                         ps.getParameter<double>("phaseNS")
-                ));
-        }
-
-        return algo;
     }
 
     // The following function should apply the SiPM nonlinearity

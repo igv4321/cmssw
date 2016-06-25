@@ -97,7 +97,7 @@ public:
     inline const float* riseTime() const
         {if (hasTimeInfo_) return riseTime_; else return nullptr;}
 
-    // Indexed access to time slice quiantities. No bounds checking.
+    // Indexed access to time slice quantities. No bounds checking.
     inline double tsRawCharge(const unsigned ts) const {return rawCharge_[ts];}
     inline double tsPedestal(const unsigned ts) const {return pedestal_[ts];}
     inline double tsCharge(const unsigned ts) const

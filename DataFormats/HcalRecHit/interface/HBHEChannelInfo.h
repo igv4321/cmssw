@@ -31,11 +31,11 @@ public:
 
 
     inline HBHEChannelInfo()
-        : charge_{0.}, gain_{0.}, riseTime_{0.f}, adc_{0},
+        : rawCharge_{0.}, pedestal_{0.}, gain_{0.}, riseTime_{0.f}, adc_{0},
           hasTimeInfo_(false) {clear();}
 
     inline explicit HBHEChannelInfo(const bool hasTimeFromTDC)
-        : charge_{0.}, gain_{0.}, riseTime_{0.f}, adc_{0},
+        : rawCharge_{0.}, pedestal_{0.}, gain_{0.}, riseTime_{0.f}, adc_{0},
           hasTimeInfo_(hasTimeFromTDC) {clear();}
 
     inline void clear()
@@ -68,9 +68,15 @@ public:
 
     // For speed, the "setSample" function does not perform bounds checking
     inline void setSample(const unsigned ts, const uint8_t rawADC,
-                          const double q, const double g,
+                          const double q, const double ped, const double g,
                           const float t = UNKNOWN_T_NOTDC)
-        {charge_[ts] = q; gain_[ts] = g; riseTime_[ts] = t; adc_[ts] = rawADC;}
+    {
+        rawCharge_[ts] = q;
+        pedestal_[ts] = ped;
+        gain_[ts] = g;
+        riseTime_[ts] = t;
+        adc_[ts] = rawADC;
+    }
 
     // Inspectors
     inline HcalDetId id() const {return id_;}
@@ -83,17 +89,21 @@ public:
     inline bool hasLinkError() const {return hasLinkError_;}
     inline bool hasCapidError() const {return hasCapidError_;}
 
-    // Access to time slice arrays
-    inline const double* charge() const {return charge_;}
+    // Direct read-only access to time slice arrays
+    inline const double* rawCharge() const {return rawCharge_;}
+    inline const double* pedestal() const {return pedestal_;}
     inline const double* gain() const {return gain_;}
     inline const uint8_t* adc() const {return adc_;}
     inline const float* riseTime() const
         {if (hasTimeInfo_) return riseTime_; else return nullptr;}
 
     // Indexed access to time slice quiantities. No bounds checking.
-    inline double tsCharge(const unsigned ts) const {return charge_[ts];}
+    inline double tsRawCharge(const unsigned ts) const {return rawCharge_[ts];}
+    inline double tsPedestal(const unsigned ts) const {return pedestal_[ts];}
+    inline double tsCharge(const unsigned ts) const
+        {return rawCharge_[ts] - pedestal_[ts];}
     inline double tsEnergy(const unsigned ts) const
-        {return charge_[ts]*gain_[ts];}
+        {return (rawCharge_[ts] - pedestal_[ts])*gain_[ts];}
     inline double tsGain(const unsigned ts) const {return gain_[ts];}
     inline uint8_t tsAdc(const unsigned ts) const {return adc_[ts];}
     inline float tsRiseTime(const unsigned ts) const
@@ -105,7 +115,7 @@ public:
         double sum = 0.0;
         const unsigned imax = end < nSamples_ ? end : nSamples_;
         for (unsigned i=begin; i<imax; ++i)
-            sum += charge_[i];
+            sum += (rawCharge_[i] - pedestal_[i]);
         return sum;
     }
 
@@ -114,7 +124,7 @@ public:
         double sum = 0.0;
         const unsigned imax = end < nSamples_ ? end : nSamples_;
         for (unsigned i=begin; i<imax; ++i)
-            sum += charge_[i]*gain_[i];
+            sum += (rawCharge_[i] - pedestal_[i])*gain_[i];
         return sum;
     }
 
@@ -126,11 +136,14 @@ public:
         double dmax = -DBL_MAX;
         const unsigned imax = end < nSamples_ ? end : nSamples_;
         for (unsigned i=begin; i<imax; ++i)
-            if (charge_[i] > dmax)
+        {
+            const double q = rawCharge_[i] - pedestal_[i];
+            if (q > dmax)
             {
-                dmax = charge_[i];
+                dmax = q;
                 iPeak = i;
             }
+        }
         return iPeak;
     }
 
@@ -141,7 +154,7 @@ public:
         const unsigned imax = end < nSamples_ ? end : nSamples_;
         for (unsigned i=begin; i<imax; ++i)
         {
-            const double e = charge_[i]*gain_[i];
+            const double e = (rawCharge_[i] - pedestal_[i])*gain_[i];
             if (e > dmax)
             {
                 dmax = e;
@@ -155,7 +168,10 @@ private:
     HcalDetId id_;
 
     // Charge in fC for all time slices
-    double charge_[MAXSAMPLES];
+    double rawCharge_[MAXSAMPLES];
+
+    // Pedestal in fC
+    double pedestal_[MAXSAMPLES];
 
     // fC to GeV conversion factor (can depend on CAPID)
     double gain_[MAXSAMPLES];

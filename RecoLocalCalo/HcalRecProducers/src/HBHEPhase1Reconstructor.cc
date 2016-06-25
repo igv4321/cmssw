@@ -85,14 +85,14 @@ namespace {
                                    const HcalCalibrations& calib)
     {
         // FIX THIS!!!
-        return decodedCharge - calib.pedestal(s.capid());
+        return decodedCharge;
     }
 
     double getHBHEChargeFromSample(const HcalQIESample& s,
                                    const double decodedCharge,
                                    const HcalCalibrations& calib)
     {
-        return decodedCharge - calib.pedestal(s.capid());
+        return decodedCharge;
     }
 
     float getTDCTimeFromSample(const QIE11DataFrame::Sample& s)
@@ -304,12 +304,14 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
         for (int ts = 0; ts < maxTS; ++ts)
         {
             auto s(frame[ts]);
-            const double charge = getHBHEChargeFromSample(s, cs[ts], calib);
-            const double gain = calib.respcorrgain(s.capid());
+            const int capid = s.capid();
+            const double pedestal = calib.pedestal(capid);
+            const double gain = calib.respcorrgain(capid);
+            const double rawCharge = getHBHEChargeFromSample(s, cs[ts], calib);
             const float t = getTDCTimeFromSample(s);
-            channelInfo->setSample(ts, s.adc(), charge, gain, t);
+            channelInfo->setSample(ts, s.adc(), rawCharge, pedestal, gain, t);
             if (ts == soi)
-                soiCapid = s.capid();
+                soiCapid = capid;
         }
 
         // Fill the overall channel info items

@@ -21,6 +21,14 @@ public:
     static const unsigned N_RAW_MAX = 5;
     static const raw_type INVALID_RAW = std::numeric_limits<raw_type>::max();
 
+    // Special value for the rise time used in case the QIE10 pulse
+    // is always below the discriminator
+    static constexpr float UNKNOWN_T_UNDERSHOOT = -100.f;
+
+    // Special value for the rise time used in case the QIE10 pulse
+    // is always above the discriminator
+    static constexpr float UNKNOWN_T_OVERSHOOT = -110.f;
+
     HFQIE10Info();
 
     // Argument "soi" provides the index of the sample of interest
@@ -39,6 +47,9 @@ public:
     inline unsigned soi() const {return soi_;}
     inline raw_type getRaw(const unsigned which) const
        {return which >= nRaw_ ? INVALID_RAW : raw_[which];}
+
+    static inline bool isSpecialTimeValue(const float t)
+       {return t == UNKNOWN_T_UNDERSHOOT || t == UNKNOWN_T_OVERSHOOT;}
 
 private:
     HcalDetId id_;

@@ -1,11 +1,17 @@
 #ifndef RecoLocalCalo_HcalRecAlgos_SimpleHBHEPhase1Algo_h_
 #define RecoLocalCalo_HcalRecAlgos_SimpleHBHEPhase1Algo_h_
 
+#include <memory>
+#include <vector>
+
 // Base class header
 #include "RecoLocalCalo/HcalRecAlgos/interface/AbsHBHEPhase1Algo.h"
 
 // Other headers
 #include "CalibCalorimetry/HcalAlgos/interface/HcalPulseContainmentManager.h"
+
+#include "RecoLocalCalo/HcalRecAlgos/interface/PulseShapeFitOOTPileupCorrection.h"
+#include "RecoLocalCalo/HcalRecAlgos/interface/HcalDeterministicFit.h"
 
 
 class SimpleHBHEPhase1Algo : public AbsHBHEPhase1Algo
@@ -24,9 +30,18 @@ public:
     //   phaseNS          -- default "phase" parameter for the pulse
     //                       containment correction
     //
+    //   timeShift        -- time shift for QIE11 TDC times
+    //
+    //   m2               -- "Method 2" object
+    //
+    //   detFit           -- "Method 3" (a.k.a. "deterministic fit") object
+    //
     SimpleHBHEPhase1Algo(int firstSampleShift,
                          int samplesToAdd,
-                         float phaseNS);
+                         float phaseNS,
+                         float timeShift,
+                         std::unique_ptr<PulseShapeFitOOTPileupCorrection> m2,
+                         std::unique_ptr<HcalDeterministicFit> detFit);
 
     inline virtual ~SimpleHBHEPhase1Algo() {}
 
@@ -46,6 +61,7 @@ public:
     inline float getPhaseNS() const {return phaseNS_;}
     inline int getRunNumber() const {return runnum_;}
 
+protected:
     // Special HB- correction
     float hbminusCorrectionFactor(const HcalDetId& cell,
                                   float energy, bool isRealData) const;
@@ -68,7 +84,12 @@ private:
     int firstSampleShift_;
     int samplesToAdd_;
     float phaseNS_;
+    float timeShift_;
     int runnum_;
+
+    std::unique_ptr<PulseShapeFitOOTPileupCorrection> psFitOOTpuCorr_;
+
+    std::unique_ptr<HcalDeterministicFit> hltOOTpuCorr_;
 };
 
 #endif // RecoLocalCalo_HcalRecAlgos_SimpleHBHEPhase1Algo_h_

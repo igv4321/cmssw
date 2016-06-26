@@ -4,23 +4,32 @@
 
 #include "RecoLocalCalo/HcalRecAlgos/interface/SimpleHBHEPhase1Algo.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/timeshift_ns_hbheho.h"
+#include "RecoLocalCalo/HcalRecAlgos/interface/HBHERecHitAuxSetter.h"
 
 #include "FWCore/Framework/interface/Run.h"
 
+#include "DataFormats/METReco/interface/HcalCaloFlagLabels.h"
 
 // Maximum fractional error for calculating Method 0
 // pulse containment correction
 constexpr float PulseContainmentFractionalError = 0.002f;
 
 
-SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(const int firstSampleShift,
-                                           const int samplesToAdd,
-                                           const float phaseNS)
+SimpleHBHEPhase1Algo::SimpleHBHEPhase1Algo(
+    const int firstSampleShift,
+    const int samplesToAdd,
+    const float phaseNS,
+    const float timeShift,
+    std::unique_ptr<PulseShapeFitOOTPileupCorrection> m2,
+    std::unique_ptr<HcalDeterministicFit> detFit)
     : pulseCorr_(PulseContainmentFractionalError),
       firstSampleShift_(firstSampleShift),
       samplesToAdd_(samplesToAdd),
       phaseNS_(phaseNS),
-      runnum_(0)
+      timeShift_(timeShift),
+      runnum_(0),
+      psFitOOTpuCorr_(std::move(m2)),
+      hltOOTpuCorr_(std::move(detFit))
 {
 }
 
@@ -33,6 +42,7 @@ void SimpleHBHEPhase1Algo::beginRun(const edm::Run& r,
 
 void SimpleHBHEPhase1Algo::endRun()
 {
+    runnum_ = 0;
     pulseCorr_.endRun();
 }
 
@@ -43,17 +53,74 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
 {
     HBHERecHit rh;
 
-    // Calculate "method 0" quantities
-    int ibeg = static_cast<int>(info.soi()) + firstSampleShift_;
-    if (ibeg < 0)
-        ibeg = 0;
-    const double fc_ampl = info.chargeInWindow(ibeg, ibeg + samplesToAdd_);
-    const bool applyContainment = params ? params->correctForPhaseContainment() : true;
-    const float phasens = params ? params->correctionPhaseNS() : phaseNS_;
-    float m0E = m0Energy(info, fc_ampl, applyContainment, phasens);
-    m0E *= hbminusCorrectionFactor(info.id(), m0E, isData);
-    const float m0T = m0Time(info, fc_ampl, calibs);
-    rh = HBHERecHit(info.id(), m0E, m0T);
+    const HcalDetId channelId(info.id());
+
+    // Calculate "Method 0" quantities
+    float m0t = 0.f, m0E = 0.f;
+    {
+        int ibeg = static_cast<int>(info.soi()) + firstSampleShift_;
+        if (ibeg < 0)
+            ibeg = 0;
+        const double fc_ampl = info.chargeInWindow(ibeg, ibeg + samplesToAdd_);
+        const bool applyContainment = params ? params->correctForPhaseContainment() : true;
+        const float phasens = params ? params->correctionPhaseNS() : phaseNS_;
+        m0E = m0Energy(info, fc_ampl, applyContainment, phasens);
+        m0E *= hbminusCorrectionFactor(channelId, m0E, isData);
+        m0t = m0Time(info, fc_ampl, calibs);
+    }
+
+    // Run "Method 2"
+    float m2t = 0.f, m2E = 0.f;
+    bool useTriple = false;
+    const PulseShapeFitOOTPileupCorrection* method2 = psFitOOTpuCorr_.get();
+    if (method2)
+    {
+        // FIX THIS!!!
+        m2E = 1.f;
+        m2t = 1.f;
+        useTriple = true;
+
+        m2E *= hbminusCorrectionFactor(channelId, m2E, isData);
+    }
+
+    // Run "Method 3"
+    float m3t = 0.f, m3E = 0.f;
+    const HcalDeterministicFit* method3 = hltOOTpuCorr_.get();
+    if (method3)
+    {
+        // FIX THIS!!!
+        m3E = 1.f;
+        m3t = 1.f;
+
+        m3E *= hbminusCorrectionFactor(channelId, m3E, isData);
+    }
+
+    // Finally, construct the rechit
+    float rhE = m0E;
+    float rht = m0t;
+    if (method2)
+    {
+        rhE = m2E;
+        rht = m2t;
+    }
+    else if (method3)
+    {
+        rhE = m3E;
+        rht = m3t;
+    }
+    float tdcTime = info.soiRiseTime();
+    if (!HBHEChannelInfo::isSpecialTimeValue(tdcTime))
+        tdcTime += timeShift_;
+    rh = HBHERecHit(channelId, rhE, rht, tdcTime);
+    rh.setRawEnergy(m0E);
+    rh.setAuxEnergy(m3E);
+
+    // Set rechit aux words
+    HBHERecHitAuxSetter::setAux(info, &rh);
+
+    // Set rechit flags -- FIX THIS!!!
+    if (useTriple)
+        rh.setFlagField(1, HcalCaloFlagLabels::HBHEPulseFitBit);
 
     return rh;
 }

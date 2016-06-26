@@ -4,7 +4,6 @@
 #include <cfloat>
 
 #include "DataFormats/HcalDetId/interface/HcalDetId.h"
-// #include "DataFormats/HcalRecHit/interface/HFQIE10Info.h"
 
 // Unpacked charge and TDC information in a format which works
 // for both QIE8 and QIE11
@@ -17,12 +16,10 @@ public:
 
     // Special value for the rise time used in case the QIE11 pulse
     // is always below the discriminator
-    // static constexpr float UNKNOWN_T_UNDERSHOOT = HFQIE10Info::UNKNOWN_T_UNDERSHOOT;
     static constexpr float UNKNOWN_T_UNDERSHOOT = -100.f;
 
     // Special value for the rise time used in case the QIE11 pulse
     // is always above the discriminator
-    // static constexpr float UNKNOWN_T_OVERSHOOT = HFQIE10Info::UNKNOWN_T_OVERSHOOT;
     static constexpr float UNKNOWN_T_OVERSHOOT = -110.f;
 
     // Special value for the rise time that can be used in case the TDC
@@ -109,6 +106,13 @@ public:
     inline float tsRiseTime(const unsigned ts) const
         {return hasTimeInfo_ ? riseTime_[ts] : UNKNOWN_T_NOTDC;}
 
+    // Signal rise time measurement for the SOI, if available
+    inline float soiRiseTime() const
+    {
+        return (hasTimeInfo_ && soi_ < nSamples_) ?
+                riseTime_[soi_] : UNKNOWN_T_NOTDC;
+    }
+
     // The TS with the "end" index is not included in the window
     inline double chargeInWindow(const unsigned begin, const unsigned end) const
     {
@@ -162,6 +166,13 @@ public:
             }
         }
         return iPeak;
+    }
+
+    static inline bool isSpecialTimeValue(const float t)
+    {
+        return t == UNKNOWN_T_UNDERSHOOT ||
+               t == UNKNOWN_T_OVERSHOOT ||
+               t == UNKNOWN_T_NOTDC;
     }
 
 private:

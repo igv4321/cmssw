@@ -1,5 +1,6 @@
 <lcgdict>
-   <class name="HBHERecHit" ClassVersion="16">
+   <class name="HBHERecHit" ClassVersion="17">
+    <version ClassVersion="17" checksum="4076697378"/>
     <version ClassVersion="16" checksum="2359330573"/>
     <version ClassVersion="15" checksum="3086172316"/>
     <version ClassVersion="14" checksum="525320376"/>

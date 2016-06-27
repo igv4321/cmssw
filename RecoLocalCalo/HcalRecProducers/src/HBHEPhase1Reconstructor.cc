@@ -182,6 +182,9 @@ private:
     std::unique_ptr<AbsHFPhase1AlgoData> recoConfig_;
     std::unique_ptr<HcalRecoParams> paramTS_;
 
+    // Status bit setters
+    // ... Not available yet ...
+
     // For the function below, arguments "infoColl" and/or "rechits"
     // are allowed to be null.
     template<class DataFrame, class Collection>
@@ -193,6 +196,13 @@ private:
                      HBHEChannelInfo* info,
                      HBHEChannelInfoCollection* infoColl,
                      HBHERecHitCollection* rechits);
+
+    // Methods for setting rechit status bits
+    void setRechitStatusBits(const HBHEDataFrame& frame,
+                             const HBHEChannelInfo& info, HBHERecHit* rh);
+    void setRechitStatusBits(const QIE11DataFrame& frame,
+                             const HBHEChannelInfo& info, HBHERecHit* rh);
+    void setCommonStatusBits(const HBHEChannelInfo& info, HBHERecHit* rh);
 };
 
 //
@@ -331,12 +341,36 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
             const HcalRecoParam* pptr = nullptr;
             if (recoParamsFromDB_)
                 pptr = param_ts;
-            const HBHERecHit& rh = reco_->reconstruct(
-                *channelInfo, pptr, calib, isRealData);
+            HBHERecHit rh = reco_->reconstruct(*channelInfo, pptr, calib, isRealData);
             if (rh.id().rawId())
+            {
+                setRechitStatusBits(frame, *channelInfo, &rh);
                 rechits->push_back(rh);
+            }
         }
     }
+}
+
+void HBHEPhase1Reconstructor::setCommonStatusBits(
+    const HBHEChannelInfo& info, HBHERecHit* rh)
+{
+    // FIX THIS!!! after status bit inventory
+}
+
+void HBHEPhase1Reconstructor::setRechitStatusBits(
+    const HBHEDataFrame& frame, const HBHEChannelInfo& info, HBHERecHit* rh)
+{
+    setCommonStatusBits(info, rh);
+
+    // FIX THIS!!! after status bit inventory
+}
+
+void HBHEPhase1Reconstructor::setRechitStatusBits(
+    const QIE11DataFrame& frame, const HBHEChannelInfo& info, HBHERecHit* rh)
+{
+    setCommonStatusBits(info, rh);
+
+    // FIX THIS!!! after status bit inventory
 }
 
 // ------------ method called to produce the data  ------------
@@ -347,7 +381,7 @@ HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetu
 
     // Get the Hcal topology if needed
     ESHandle<HcalTopology> htopo;
-    if (tsFromDB_)
+    if (tsFromDB_ || recoParamsFromDB_)
     {
         eventSetup.get<HcalRecNumberingRecord>().get(htopo);
         paramTS_->setTopo(htopo.product());

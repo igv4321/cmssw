@@ -87,10 +87,10 @@ parseHBHEPhase1AlgoDescription(const edm::ParameterSet& ps)
             detFit = parseHBHEMethod3Description(ps);
 
         algo = std::unique_ptr<AbsHBHEPhase1Algo>(
-            new SimpleHBHEPhase1Algo(ps.getParameter<int>("firstSampleShift"),
-                                     ps.getParameter<int>("samplesToAdd"),
-                                     ps.getParameter<double>("phaseNS"),
-                                     ps.getParameter<double>("timeShift"),
+            new SimpleHBHEPhase1Algo(ps.getParameter<int>   ("firstSampleShift"),
+                                     ps.getParameter<int>   ("samplesToAdd"),
+                                     ps.getParameter<double>("correctionPhaseNS"),
+                                     ps.getParameter<double>("tdcTimeShift"),
                                      std::move(m2), std::move(detFit))
             );
     }

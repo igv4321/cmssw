@@ -3,7 +3,7 @@
 #include "CalibCalorimetry/HcalAlgos/interface/HcalTimeSlew.h"
 
 #include "RecoLocalCalo/HcalRecAlgos/interface/SimpleHBHEPhase1Algo.h"
-#include "RecoLocalCalo/HcalRecAlgos/interface/timeshift_ns_hbheho.h"
+#include "RecoLocalCalo/HcalRecAlgos/interface/HcalCorrectionFunctions.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/HBHERecHitAuxSetter.h"
 
 #include "FWCore/Framework/interface/Run.h"
@@ -75,11 +75,7 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     const PulseShapeFitOOTPileupCorrection* method2 = psFitOOTpuCorr_.get();
     if (method2)
     {
-        // FIX THIS!!!
-        m2E = 1.f;
-        m2t = 1.f;
-        useTriple = true;
-
+        method2->phase1Apply(info, calibs, &m2E, &m2t, &useTriple);
         m2E *= hbminusCorrectionFactor(channelId, m2E, isData);
     }
 
@@ -88,10 +84,7 @@ HBHERecHit SimpleHBHEPhase1Algo::reconstruct(const HBHEChannelInfo& info,
     const HcalDeterministicFit* method3 = hltOOTpuCorr_.get();
     if (method3)
     {
-        // FIX THIS!!!
-        m3E = 1.f;
-        m3t = 1.f;
-
+        method3->phase1Apply(info, calibs, &m3E, &m3t);
         m3E *= hbminusCorrectionFactor(channelId, m3E, isData);
     }
 

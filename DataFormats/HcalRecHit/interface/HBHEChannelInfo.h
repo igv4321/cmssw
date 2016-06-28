@@ -65,8 +65,8 @@ public:
 
     // For speed, the "setSample" function does not perform bounds checking
     inline void setSample(const unsigned ts, const uint8_t rawADC,
-                          const double q, const double ped, const double g,
-                          const float t = UNKNOWN_T_NOTDC)
+                          const double q, const double ped,
+                          const double g, const float t)
     {
         rawCharge_[ts] = q;
         pedestal_[ts] = ped;

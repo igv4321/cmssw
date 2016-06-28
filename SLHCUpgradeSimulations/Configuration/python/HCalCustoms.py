@@ -100,7 +100,13 @@ def customise_Hcal2017Full(process):
     
     #use HE phase1 conditions - test SiPM/QIE11
     process.es_hardcode.useHEUpgrade = cms.bool(True)
-    
+
+    if hasattr(process,'reconstruction_step'):
+        # Customise HB/HE reco
+        from RecoLocalCalo.HcalRecProducers.HBHEPhase1Reconstructor_cfi import hbheprereco
+        process.globalReplace("hbheprereco", hbheprereco)
+        process.hbheprereco.digiLabelHB = cms.InputTag("simHcalDigis", "HBHEDigiCollection")
+
     return process
     
 def customise_HcalPhase1(process):

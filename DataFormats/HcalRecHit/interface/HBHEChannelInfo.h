@@ -168,6 +168,18 @@ public:
         return iPeak;
     }
 
+    // The following function can be used, for example,
+    // in a check for presence of saturated ADC values
+    inline uint8_t peakAdcValue(const unsigned begin, const unsigned end) const
+    {
+        uint8_t peak = 0;
+        const unsigned imax = end < nSamples_ ? end : nSamples_;
+        for (unsigned i=begin; i<imax; ++i)
+            if (adc_[i] > peak)
+                peak = adc_[i];
+        return peak;
+    }
+
     static inline bool isSpecialTimeValue(const float t)
     {
         return t == UNKNOWN_T_UNDERSHOOT ||

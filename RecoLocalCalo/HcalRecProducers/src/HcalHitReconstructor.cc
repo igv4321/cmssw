@@ -340,12 +340,11 @@ void HcalHitReconstructor::beginRun(edm::Run const&r, edm::EventSetup const & es
       edm::ESHandle<HcalFlagHFDigiTimeParams> p;
       es.get<HcalFlagHFDigiTimeParamsRcd>().get(p);
       HFDigiTimeParams.reset( new HcalFlagHFDigiTimeParams( *p ) );
-
-      edm::ESHandle<HcalTopology> htopo;
-      es.get<HcalRecNumberingRecord>().get(htopo);
       HFDigiTimeParams->setTopo(htopo.product());
-
     }
+
+  if (setNoiseFlags_)
+      hbheFlagSetter_->setTopo(htopo.product());
 
   reco_.beginRun(es);
 }

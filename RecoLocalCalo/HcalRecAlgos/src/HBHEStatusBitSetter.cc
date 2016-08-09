@@ -1,3 +1,4 @@
+#include <iostream>
 #include "RecoLocalCalo/HcalRecAlgos/interface/HBHEStatusBitSetter.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "CalibCalorimetry/HcalAlgos/interface/HcalLogicalMapGenerator.h"
@@ -37,6 +38,31 @@ HBHEStatusBitSetter::HBHEStatusBitSetter(double nominalPedestal,
     pulseShapeParameters_.push_back(params);
   }
 
+}
+
+void HBHEStatusBitSetter::setTopo(const HcalTopology* topo)
+{
+    using namespace std;
+
+    if (logicalMap_)
+    {
+        cout << "In HBHEStatusBitSetter::setTopo: destroying logicalMap\n";
+        cout.flush();
+    }
+    delete logicalMap_;
+    logicalMap_=0;
+
+    cout << "In HBHEStatusBitSetter::setTopo: making HcalLogicalMapGenerator\n";
+    cout.flush();
+    HcalLogicalMapGenerator gen;
+
+    cout << "In HBHEStatusBitSetter::setTopo: creating logicalMap\n";
+    cout.flush();
+    const HcalLogicalMap& myMap = gen.createMap(topo);
+
+    cout << "In HBHEStatusBitSetter::setTopo: copying logicalMap\n";
+    cout.flush();
+    logicalMap_=new HcalLogicalMap(myMap);
 }
 
 HBHEStatusBitSetter::~HBHEStatusBitSetter() {

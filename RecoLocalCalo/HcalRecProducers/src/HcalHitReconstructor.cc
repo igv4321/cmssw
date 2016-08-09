@@ -343,7 +343,7 @@ void HcalHitReconstructor::beginRun(edm::Run const&r, edm::EventSetup const & es
       HFDigiTimeParams->setTopo(htopo.product());
     }
 
-  if (setNoiseFlags_)
+  if (hbheFlagSetter_)
       hbheFlagSetter_->setTopo(htopo.product());
 
   reco_.beginRun(es);
@@ -556,7 +556,7 @@ void HcalHitReconstructor::produce(edm::Event& e, const edm::EventSetup& eventSe
 	if (hbheTimingShapedFlagSetter_!=0)
 	  hbheTimingShapedFlagSetter_->SetTimingShapedFlags(rec->back());
 	if (setNoiseFlags_)
-	  hbheFlagSetter_->SetFlagsFromDigi(&(*topo),rec->back(),*i,coder,calibrations,first,toadd);
+	  hbheFlagSetter_->SetFlagsFromDigi(rec->back(), *i, coder, calibrations);
 	if (setPulseShapeFlags_)
 	  hbhePulseShapeFlagSetter_->SetPulseShapeFlags(rec->back(), *i, coder, calibrations);
 	if (setNegativeFlags_)
@@ -579,7 +579,7 @@ void HcalHitReconstructor::produce(edm::Event& e, const edm::EventSetup& eventSe
       } // loop over HBHE digis
 
 
-      if (setNoiseFlags_) hbheFlagSetter_->SetFlagsFromRecHits(&(*topo),*rec);
+      if (setNoiseFlags_) hbheFlagSetter_->SetFlagsFromRecHits(*rec);
       if (setHSCPFlags_)  hbheHSCPFlagSetter_->hbheSetTimeFlagsFromDigi(rec.get(), HBDigis, RecHitIndex);
       // return result
       e.put(rec);

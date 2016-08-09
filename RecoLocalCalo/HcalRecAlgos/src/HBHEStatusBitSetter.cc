@@ -63,6 +63,9 @@ void HBHEStatusBitSetter::setTopo(const HcalTopology* topo)
     cout << "In HBHEStatusBitSetter::setTopo: copying logicalMap\n";
     cout.flush();
     logicalMap_=new HcalLogicalMap(myMap);
+
+    cout << "HBHEStatusBitSetter::setTopo: finished\n";
+    cout.flush();
 }
 
 HBHEStatusBitSetter::~HBHEStatusBitSetter() {

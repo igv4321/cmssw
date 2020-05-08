@@ -258,6 +258,7 @@ public:
 private:
   void beginRun(edm::Run const&, edm::EventSetup const&) override;
   void endRun(edm::Run const&, edm::EventSetup const&) override;
+  void beginLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&) override;
   void produce(edm::Event&, const edm::EventSetup&) override;
 
   // Configuration parameters
@@ -300,8 +301,9 @@ private:
   // Cached table of channel properties
   std::vector<HBHEChannelProperties> channelProperties_;
 
-  // Method to update the cached table of channel properties
-  void rebuildChannelProperties(edm::EventSetup const&);
+  // Methods to update the cached table of channel properties
+  void rebuildChannelProperties(edm::EventSetup const&); // in beginRun
+  void updateChannelProperties(edm::EventSetup const&);  // in beginLuminosityBlock
 
   // For the function below, arguments "infoColl" and/or "rechits"
   // are allowed to be null.
@@ -735,6 +737,39 @@ void HBHEPhase1Reconstructor::rebuildChannelProperties(edm::EventSetup const& ev
       channelProperties_.emplace_back();
     }
   }
+}
+
+// The channel quality can be defined per lumi section, so update it separately
+void HBHEPhase1Reconstructor::updateChannelProperties(edm::EventSetup const& eventSetup) {
+  using namespace edm;
+
+  const HcalTopology& htopo(*(paramTS_->topo()));
+
+  ESHandle<HcalChannelQuality> qualHandle;
+  eventSetup.get<HcalChannelQualityRcd>().get("withTopo", qualHandle);
+  const HcalChannelQuality& qual(*qualHandle);
+
+  ESHandle<HcalSeverityLevelComputer> sevHandle;
+  eventSetup.get<HcalSeverityLevelComputerRcd>().get(sevHandle);
+  const HcalSeverityLevelComputer& severity(*sevHandle);
+
+  // Update the table
+  const unsigned tableSize = channelProperties_.size();
+  for (unsigned linearId=0; linearId<tableSize; ++linearId) {
+    const HcalDetId cell(htopo.denseId2detId(linearId));
+    const HcalSubdetector subdet = cell.subdet();
+    if (subdet == HcalSubdetector::HcalBarrel || subdet == HcalSubdetector::HcalEndcap) {
+      // Check if the database tells us to drop this channel
+      const HcalChannelStatus* mydigistatus = qual.getValues(cell.rawId());
+      channelProperties_[linearId].taggedBadByDb = severity.dropChannel(mydigistatus->getValue());
+    }
+  }
+}
+
+// ------------ method called when starting to processes a lumi block  ------------
+void HBHEPhase1Reconstructor::beginLuminosityBlock(edm::LuminosityBlock const&,
+                                                   edm::EventSetup const& es) {
+  updateChannelProperties(es);
 }
 
 // ------------ method called when starting to processes a run  ------------

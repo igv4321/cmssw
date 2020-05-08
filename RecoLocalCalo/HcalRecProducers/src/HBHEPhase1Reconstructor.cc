@@ -18,6 +18,7 @@
 
 // system include files
 #include <cmath>
+#include <vector>
 #include <utility>
 #include <algorithm>
 
@@ -49,6 +50,7 @@
 #include "RecoLocalCalo/HcalRecAlgos/interface/HcalSeverityLevelComputerRcd.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/HBHEStatusBitSetter.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/HBHEPulseShapeFlag.h"
+#include "RecoLocalCalo/HcalRecAlgos/interface/HBHEChannelProperties.h"
 
 #include "CondFormats/HcalObjects/interface/HBHENegativeEFilter.h"
 #include "CondFormats/DataRecord/interface/HBHENegativeEFilterRcd.h"
@@ -75,7 +77,7 @@ namespace {
     inline RawChargeFromSample(const int sipmQTSShift,
                                const int sipmQNTStoSum,
                                const HcalDbService& cond,
-                               const HcalDetId id,
+                               const HBHEChannelProperties& properties,
                                const CaloSamples& cs,
                                const int soi,
                                const DFrame& frame,
@@ -90,24 +92,23 @@ namespace {
     inline RawChargeFromSample(const int sipmQTSShift,
                                const int sipmQNTStoSum,
                                const HcalDbService& cond,
-                               const HcalDetId id,
+                               const HBHEChannelProperties& properties,
                                const CaloSamples& cs,
                                const int soi,
                                const QIE11DataFrame& frame,
                                const int maxTS)
-        : siPMParameter_(*cond.getHcalSiPMParameter(id)),
+        : siPMParameter_(*properties.siPMParameter),
           fcByPE_(siPMParameter_.getFCByPE()),
           corr_(cond.getHcalSiPMCharacteristics()->getNonLinearities(siPMParameter_.getType())) {
       if (fcByPE_ <= 0.0)
-        throw cms::Exception("HBHEPhase1BadDB") << "Invalid fC/PE conversion factor for SiPM " << id << std::endl;
+        throw cms::Exception("HBHEPhase1BadDB") << "Invalid fC/PE conversion factor" << std::endl;
 
-      const HcalCalibrations& calib = cond.getHcalCalibrations(id);
       const int firstTS = std::max(soi + sipmQTSShift, 0);
       const int lastTS = std::min(firstTS + sipmQNTStoSum, maxTS);
       double sipmQ = 0.0;
 
       for (int ts = firstTS; ts < lastTS; ++ts) {
-        const double pedestal = calib.pedestal(frame[ts].capid());
+        const float pedestal = properties.pedsAndGains[frame[ts].capid()].pedestal(false);
         sipmQ += (cs[ts] - pedestal);
       }
 
@@ -296,13 +297,17 @@ private:
   std::unique_ptr<HBHEPulseShapeFlagSetter> hbhePulseShapeFlagSetterQIE8_;
   std::unique_ptr<HBHEPulseShapeFlagSetter> hbhePulseShapeFlagSetterQIE11_;
 
+  // Cached table of channel properties
+  std::vector<HBHEChannelProperties> channelProperties_;
+
+  // Method to update the cached table of channel properties
+  void rebuildChannelProperties(edm::EventSetup const&);
+
   // For the function below, arguments "infoColl" and/or "rechits"
   // are allowed to be null.
   template <class DataFrame, class Collection>
   void processData(const Collection& coll,
                    const HcalDbService& cond,
-                   const HcalChannelQuality& qual,
-                   const HcalSeverityLevelComputer& severity,
                    const bool isRealData,
                    HBHEChannelInfo* info,
                    HBHEChannelInfoCollection* infoColl,
@@ -396,8 +401,6 @@ HBHEPhase1Reconstructor::~HBHEPhase1Reconstructor() {
 template <class DFrame, class Collection>
 void HBHEPhase1Reconstructor::processData(const Collection& coll,
                                           const HcalDbService& cond,
-                                          const HcalChannelQuality& qual,
-                                          const HcalSeverityLevelComputer& severity,
                                           const bool isRealData,
                                           HBHEChannelInfo* channelInfo,
                                           HBHEChannelInfoCollection* infos,
@@ -408,6 +411,8 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
   // Note that this flag affects only "infos", the rechits are still
   // not going to be constructed from such channels.
   const bool skipDroppedChannels = !(infos && saveDroppedInfos_);
+
+  const HcalTopology& htopo(*(paramTS_->topo()));
 
   // Iterate over the input collection
   for (typename Collection::const_iterator it = coll.begin(); it != coll.end(); ++it) {
@@ -421,10 +426,14 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
     if (!(subdet == HcalSubdetector::HcalBarrel || subdet == HcalSubdetector::HcalEndcap))
       continue;
 
+    // Look up channel properties
+    const HBHEChannelProperties& properties(channelProperties_.at(htopo.detId2denseId(cell)));
+
+    // Make sure these properties were not created by the default constructor
+    assert(properties.channelCoder);
+
     // Check if the database tells us to drop this channel
-    const HcalChannelStatus* mydigistatus = qual.getValues(cell.rawId());
-    const bool taggedBadByDb = severity.dropChannel(mydigistatus->getValue());
-    if (taggedBadByDb && skipDroppedChannels)
+    if (properties.taggedBadByDb && skipDroppedChannels)
       continue;
 
     // Check if the channel is zero suppressed
@@ -435,23 +444,17 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
     if (dropByZS && skipDroppedChannels)
       continue;
 
-    // Basic ADC decoding tools
-    const HcalRecoParam* param_ts = paramTS_->getValues(cell.rawId());
-    const HcalCalibrations& calib = cond.getHcalCalibrations(cell);
-    const HcalCalibrationWidths& calibWidth = cond.getHcalCalibrationWidths(cell);
-    const HcalQIECoder* channelCoder = cond.getHcalCoder(cell);
-    const HcalQIEShape* shape = cond.getHcalShape(channelCoder);
-    const HcalCoderDb coder(*channelCoder, *shape);
+    // ADC decoding tool
+    const HcalCoderDb coder(*properties.channelCoder, *properties.shape);
 
     const bool saveEffectivePeds = channelInfo->hasEffectivePedestals();
-    const HcalSiPMParameter& siPMParameter(*cond.getHcalSiPMParameter(cell));
-    const double fcByPE = siPMParameter.getFCByPE();
+    const double fcByPE = properties.siPMParameter->getFCByPE();
     double darkCurrent = 0.;
     double lambda = 0.;
     if (!saveEffectivePeds || saveInfos_) {
       // needed for the dark current in the M2 in alternative of the effectivePed
-      darkCurrent = siPMParameter.getDarkCurrent();
-      lambda = cond.getHcalSiPMCharacteristics()->getCrossTalk(siPMParameter.getType());
+      darkCurrent = properties.siPMParameter->getDarkCurrent();
+      lambda = cond.getHcalSiPMCharacteristics()->getCrossTalk(properties.siPMParameter->getType());
     }
 
     // ADC to fC conversion
@@ -461,8 +464,8 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
     // Prepare to iterate over time slices
     const int nRead = cs.size();
     const int maxTS = std::min(nRead, static_cast<int>(HBHEChannelInfo::MAXSAMPLES));
-    const int soi = tsFromDB_ ? param_ts->firstSample() : frame.presamples();
-    const RawChargeFromSample<DFrame> rcfs(sipmQTSShift_, sipmQNTStoSum_, cond, cell, cs, soi, frame, maxTS);
+    const int soi = tsFromDB_ ? properties.paramTs->firstSample() : frame.presamples();
+    const RawChargeFromSample<DFrame> rcfs(sipmQTSShift_, sipmQNTStoSum_, cond, properties, cs, soi, frame, maxTS);
     int soiCapid = 4;
 
     // Typical expected cases:
@@ -505,24 +508,24 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
       auto s(frame[inputTS]);
       const uint8_t adc = s.adc();
       const int capid = s.capid();
-      //optionally store "effective" pedestal (measured with bias voltage on)
-      // = QIE contribution + SiPM contribution (from dark current + crosstalk)
-      const double pedestal = saveEffectivePeds ? calib.effpedestal(capid) : calib.pedestal(capid);
-      const double pedestalWidth = saveEffectivePeds ? calibWidth.effpedestal(capid) : calibWidth.pedestal(capid);
-      const double gain = calib.respcorrgain(capid);
-      const double gainWidth = calibWidth.gain(capid);
+      const HBHEPipelinePedestalAndGain& pAndGain(properties.pedsAndGains.at(capid));
+
       //always use QIE-only pedestal for this computation
-      const double rawCharge = rcfs.getRawCharge(cs[inputTS], calib.pedestal(capid));
+      const double rawCharge = rcfs.getRawCharge(cs[inputTS], pAndGain.pedestal(false));
       const float t = getTDCTimeFromSample(s);
-      const float dfc = getDifferentialChargeGain(*channelCoder, *shape, adc, capid, channelInfo->hasTimeInfo());
-      channelInfo->setSample(copyTS, adc, dfc, rawCharge, pedestal, pedestalWidth, gain, gainWidth, t);
+      const float dfc = getDifferentialChargeGain(*properties.channelCoder, *properties.shape,
+                                                  adc, capid, channelInfo->hasTimeInfo());
+      channelInfo->setSample(copyTS, adc, dfc, rawCharge,
+                             pAndGain.pedestal(saveEffectivePeds),
+                             pAndGain.pedestalWidth(saveEffectivePeds),
+                             pAndGain.gain(), pAndGain.gainWidth(), t);
       if (inputTS == soi)
         soiCapid = capid;
     }
 
     // Fill the overall channel info items
     const int fitSoi = soi - tsShift;
-    const int pulseShapeID = param_ts->pulseShapeID();
+    const int pulseShapeID = properties.paramTs->pulseShapeID();
     const std::pair<bool, bool> hwerr = findHWErrors(frame, maxTS);
     channelInfo->setChannelInfo(cell,
                                 pulseShapeID,
@@ -534,7 +537,7 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
                                 lambda,
                                 hwerr.first,
                                 hwerr.second,
-                                taggedBadByDb || dropByZS);
+                                properties.taggedBadByDb || dropByZS);
 
     // If needed, add the channel info to the output collection
     const bool makeThisRechit = !channelInfo->isDropped();
@@ -545,11 +548,11 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
     if (rechits && makeThisRechit) {
       const HcalRecoParam* pptr = nullptr;
       if (recoParamsFromDB_)
-        pptr = param_ts;
-      HBHERecHit rh = reco_->reconstruct(*channelInfo, pptr, calib, isRealData);
+        pptr = properties.paramTs;
+      HBHERecHit rh = reco_->reconstruct(*channelInfo, pptr, *properties.calib, isRealData);
       if (rh.id().rawId()) {
-        setAsicSpecificBits(frame, coder, *channelInfo, calib, &rh);
-        setCommonStatusBits(*channelInfo, calib, &rh);
+        setAsicSpecificBits(frame, coder, *channelInfo, *properties.calib, &rh);
+        setCommonStatusBits(*channelInfo, *properties.calib, &rh);
         rechits->push_back(rh);
       }
     }
@@ -604,20 +607,9 @@ void HBHEPhase1Reconstructor::runHBHENegativeEFilter(const HBHEChannelInfo& info
 void HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& eventSetup) {
   using namespace edm;
 
-  // Get the Hcal topology
-  ESHandle<HcalTopology> htopo;
-  eventSetup.get<HcalRecNumberingRecord>().get(htopo);
-  paramTS_->setTopo(htopo.product());
-
   // Fetch the calibrations
   ESHandle<HcalDbService> conditions;
   eventSetup.get<HcalDbRecord>().get(conditions);
-
-  ESHandle<HcalChannelQuality> p;
-  eventSetup.get<HcalChannelQualityRcd>().get("withTopo", p);
-
-  ESHandle<HcalSeverityLevelComputer> mycomputer;
-  eventSetup.get<HcalSeverityLevelComputerRcd>().get(mycomputer);
 
   // Configure the negative energy filter
   ESHandle<HBHENegativeEFilter> negEHandle;
@@ -661,7 +653,7 @@ void HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& even
 
     HBHEChannelInfo channelInfo(false, false);
     processData<HBHEDataFrame>(
-        *hbDigis, *conditions, *p, *mycomputer, isData, &channelInfo, infos.get(), out.get(), use8ts_);
+        *hbDigis, *conditions, isData, &channelInfo, infos.get(), out.get(), use8ts_);
     if (setNoiseFlagsQIE8_)
       hbheFlagSetterQIE8_->SetFlagsFromRecHits(*out);
   }
@@ -672,7 +664,7 @@ void HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& even
 
     HBHEChannelInfo channelInfo(true, saveEffectivePedestal_);
     processData<QIE11DataFrame>(
-        *heDigis, *conditions, *p, *mycomputer, isData, &channelInfo, infos.get(), out.get(), use8ts_);
+        *heDigis, *conditions, isData, &channelInfo, infos.get(), out.get(), use8ts_);
     if (setNoiseFlagsQIE11_)
       hbheFlagSetterQIE11_->SetFlagsFromRecHits(*out);
   }
@@ -682,6 +674,67 @@ void HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& even
     e.put(std::move(infos));
   if (makeRecHits_)
     e.put(std::move(out));
+}
+
+void HBHEPhase1Reconstructor::rebuildChannelProperties(edm::EventSetup const& eventSetup) {
+  using namespace edm;
+
+  // Fetch various calibrations
+  ESHandle<HcalTopology> htopoHandle;
+  eventSetup.get<HcalRecNumberingRecord>().get(htopoHandle);
+  const HcalTopology& htopo(*htopoHandle);
+  paramTS_->setTopo(htopoHandle.product());
+
+  ESHandle<HcalDbService> condHandle;
+  eventSetup.get<HcalDbRecord>().get(condHandle);
+  const HcalDbService& cond(*condHandle);
+
+  ESHandle<HcalChannelQuality> qualHandle;
+  eventSetup.get<HcalChannelQualityRcd>().get("withTopo", qualHandle);
+  const HcalChannelQuality& qual(*qualHandle);
+
+  ESHandle<HcalSeverityLevelComputer> sevHandle;
+  eventSetup.get<HcalSeverityLevelComputerRcd>().get(sevHandle);
+  const HcalSeverityLevelComputer& severity(*sevHandle);
+
+  // Construct the table
+  std::array<HBHEPipelinePedestalAndGain, 4> pedsAndGains;
+  const unsigned tableSize = htopo.ncells();
+  channelProperties_.clear();
+  channelProperties_.reserve(tableSize);
+
+  for (unsigned linearId=0; linearId<tableSize; ++linearId) {
+    const HcalDetId cell(htopo.denseId2detId(linearId));
+
+    // The table is for HB/HE channels only (no HO or HF)
+    const HcalSubdetector subdet = cell.subdet();
+    if (subdet == HcalSubdetector::HcalBarrel || subdet == HcalSubdetector::HcalEndcap) {
+      // Check if the database tells us to drop this channel
+      const HcalChannelStatus* mydigistatus = qual.getValues(cell.rawId());
+      const bool taggedBadByDb = severity.dropChannel(mydigistatus->getValue());
+
+      // ADC decoding tools, etc
+      const HcalRecoParam* param_ts = paramTS_->getValues(cell.rawId());
+      const HcalQIECoder* channelCoder = cond.getHcalCoder(cell);
+      const HcalQIEShape* shape = cond.getHcalShape(channelCoder);
+      const HcalSiPMParameter* siPMParameter = cond.getHcalSiPMParameter(cell);
+
+      // Pedestals and gains
+      const HcalCalibrations& calib = cond.getHcalCalibrations(cell);
+      const HcalCalibrationWidths& calibWidth = cond.getHcalCalibrationWidths(cell);
+      for (int capid=0; capid<4; ++capid) {
+        pedsAndGains[capid] = HBHEPipelinePedestalAndGain(
+            calib.pedestal(capid), calibWidth.pedestal(capid),
+            calib.effpedestal(capid), calibWidth.effpedestal(capid),
+            calib.respcorrgain(capid), calibWidth.gain(capid));
+      }
+
+      channelProperties_.emplace_back(&calib, param_ts, channelCoder, shape,
+                                      siPMParameter, pedsAndGains, taggedBadByDb);
+    } else {
+      channelProperties_.emplace_back();
+    }
+  }
 }
 
 // ------------ method called when starting to processes a run  ------------
@@ -714,6 +767,9 @@ void HBHEPhase1Reconstructor::beginRun(edm::Run const& r, edm::EventSetup const&
   }
 
   reco_->beginRun(r, es);
+
+  // Rebuild the channel properties table
+  rebuildChannelProperties(es);
 }
 
 void HBHEPhase1Reconstructor::endRun(edm::Run const&, edm::EventSetup const&) { reco_->endRun(); }

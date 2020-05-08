@@ -691,14 +691,6 @@ void HBHEPhase1Reconstructor::rebuildChannelProperties(edm::EventSetup const& ev
   eventSetup.get<HcalDbRecord>().get(condHandle);
   const HcalDbService& cond(*condHandle);
 
-  ESHandle<HcalChannelQuality> qualHandle;
-  eventSetup.get<HcalChannelQualityRcd>().get("withTopo", qualHandle);
-  const HcalChannelQuality& qual(*qualHandle);
-
-  ESHandle<HcalSeverityLevelComputer> sevHandle;
-  eventSetup.get<HcalSeverityLevelComputerRcd>().get(sevHandle);
-  const HcalSeverityLevelComputer& severity(*sevHandle);
-
   // Construct the table
   std::array<HBHEPipelinePedestalAndGain, 4> pedsAndGains;
   const unsigned tableSize = htopo.ncells();
@@ -711,10 +703,6 @@ void HBHEPhase1Reconstructor::rebuildChannelProperties(edm::EventSetup const& ev
     // The table is for HB/HE channels only (no HO or HF)
     const HcalSubdetector subdet = cell.subdet();
     if (subdet == HcalSubdetector::HcalBarrel || subdet == HcalSubdetector::HcalEndcap) {
-      // Check if the database tells us to drop this channel
-      const HcalChannelStatus* mydigistatus = qual.getValues(cell.rawId());
-      const bool taggedBadByDb = severity.dropChannel(mydigistatus->getValue());
-
       // ADC decoding tools, etc
       const HcalRecoParam* param_ts = paramTS_->getValues(cell.rawId());
       const HcalQIECoder* channelCoder = cond.getHcalCoder(cell);
@@ -732,14 +720,14 @@ void HBHEPhase1Reconstructor::rebuildChannelProperties(edm::EventSetup const& ev
       }
 
       channelProperties_.emplace_back(&calib, param_ts, channelCoder, shape,
-                                      siPMParameter, pedsAndGains, taggedBadByDb);
+                                      siPMParameter, pedsAndGains, false);
     } else {
       channelProperties_.emplace_back();
     }
   }
 }
 
-// The channel quality can be defined per lumi section, so update it separately
+// The channel quality is defined per lumi section, so update it separately
 void HBHEPhase1Reconstructor::updateChannelProperties(edm::EventSetup const& eventSetup) {
   using namespace edm;
 

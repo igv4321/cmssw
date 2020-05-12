@@ -46,6 +46,10 @@
 
 #include "CalibCalorimetry/HcalAlgos/interface/HcalSiPMnonlinearity.h"
 
+#include "Geometry/CaloGeometry/interface/CaloGeometry.h"
+#include "Geometry/Records/interface/CaloGeometryRecord.h"
+#include "Geometry/HcalTowerAlgo/interface/HcalGeometry.h"
+
 #include "RecoLocalCalo/HcalRecAlgos/interface/HcalSeverityLevelComputer.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/HcalSeverityLevelComputerRcd.h"
 #include "RecoLocalCalo/HcalRecAlgos/interface/HBHEStatusBitSetter.h"
@@ -687,22 +691,24 @@ void HBHEPhase1Reconstructor::rebuildChannelProperties(edm::EventSetup const& ev
   const HcalTopology& htopo(*htopoHandle);
   paramTS_->setTopo(htopoHandle.product());
 
+  edm::ESHandle<CaloGeometry> pG;
+  eventSetup.get<CaloGeometryRecord>().get(pG);
+  const HcalGeometry* hcalGeom = static_cast<const HcalGeometry*>(
+      pG.product()->getSubdetectorGeometry(DetId::Hcal, HcalBarrel));
+
   ESHandle<HcalDbService> condHandle;
   eventSetup.get<HcalDbRecord>().get(condHandle);
   const HcalDbService& cond(*condHandle);
 
-  // Construct the table
+  // Construct the table. The table size may change from run to run.
   std::array<HBHEPipelinePedestalAndGain, 4> pedsAndGains;
-  const unsigned tableSize = htopo.ncells();
   channelProperties_.clear();
-  channelProperties_.reserve(tableSize);
+  channelProperties_.resize(htopo.ncells());
 
-  for (unsigned linearId=0; linearId<tableSize; ++linearId) {
-    const HcalDetId cell(htopo.denseId2detId(linearId));
-
-    // The table is for HB/HE channels only (no HO or HF)
-    const HcalSubdetector subdet = cell.subdet();
-    if (subdet == HcalSubdetector::HcalBarrel || subdet == HcalSubdetector::HcalEndcap) {
+  const HcalSubdetector subdetd[2] = {HcalBarrel, HcalEndcap};
+  for (unsigned subd = 0; subd < 2; ++subd) {
+    const std::vector<DetId>& ids = hcalGeom->getValidDetIds(DetId::Hcal, subdetd[subd]);
+    for (const auto cell : ids) {
       // ADC decoding tools, etc
       const HcalRecoParam* param_ts = paramTS_->getValues(cell.rawId());
       const HcalQIECoder* channelCoder = cond.getHcalCoder(cell);
@@ -719,12 +725,12 @@ void HBHEPhase1Reconstructor::rebuildChannelProperties(edm::EventSetup const& ev
             calib.respcorrgain(capid), calibWidth.gain(capid));
       }
 
-      channelProperties_.emplace_back(&calib, param_ts, channelCoder, shape,
-                                      siPMParameter, pedsAndGains, false);
-    } else {
-      channelProperties_.emplace_back();
+      const unsigned linearId = htopo.detId2denseId(cell);
+      channelProperties_[linearId] = HBHEChannelProperties(
+          &calib, param_ts, channelCoder, shape,
+          siPMParameter, pedsAndGains, false);
     }
-  }
+  }  
 }
 
 // The channel quality is defined per lumi section, so update it separately
@@ -744,9 +750,9 @@ void HBHEPhase1Reconstructor::updateChannelProperties(edm::EventSetup const& eve
   // Update the table
   const unsigned tableSize = channelProperties_.size();
   for (unsigned linearId=0; linearId<tableSize; ++linearId) {
-    const HcalDetId cell(htopo.denseId2detId(linearId));
-    const HcalSubdetector subdet = cell.subdet();
-    if (subdet == HcalSubdetector::HcalBarrel || subdet == HcalSubdetector::HcalEndcap) {
+    if (channelProperties_[linearId].calib) {
+      const HcalDetId cell(htopo.denseId2detId(linearId));
+
       // Check if the database tells us to drop this channel
       const HcalChannelStatus* mydigistatus = qual.getValues(cell.rawId());
       channelProperties_[linearId].taggedBadByDb = severity.dropChannel(mydigistatus->getValue());

@@ -798,6 +798,7 @@ void HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& d
 
   desc.add<edm::InputTag>("digiLabelQIE8");
   desc.add<edm::InputTag>("digiLabelQIE11");
+  desc.addUntracked<std::string>("dumpFile");
   desc.add<std::string>("algoConfigClass");
   desc.add<bool>("processQIE8");
   desc.add<bool>("processQIE11");

@@ -395,7 +395,7 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
     produces<HBHERecHitCollection>();
 
   // Open the dump file
-  if (!dumpFile_.empty()) {
+  if (!dumpFile_.empty() && dumpMax_) {
     dump_.open(dumpFile_);
     if (!dump_.is_open()) {
       std::cerr << "In HBHEPhase1Reconstructor constructor : failed to open dump file \""

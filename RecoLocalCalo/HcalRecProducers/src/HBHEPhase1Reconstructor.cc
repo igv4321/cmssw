@@ -20,6 +20,7 @@
 #include <cmath>
 #include <utility>
 #include <algorithm>
+#include <fstream>
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
@@ -260,6 +261,7 @@ private:
   void produce(edm::Event&, const edm::EventSetup&) override;
 
   // Configuration parameters
+  std::string dumpFile_;
   std::string algoConfigClass_;
   bool processQIE8_;
   bool processQIE11_;
@@ -296,6 +298,10 @@ private:
   std::unique_ptr<HBHEPulseShapeFlagSetter> hbhePulseShapeFlagSetterQIE8_;
   std::unique_ptr<HBHEPulseShapeFlagSetter> hbhePulseShapeFlagSetterQIE11_;
 
+  // Dump stream
+  std::ofstream dump_;
+  unsigned long long counter_;
+
   // For the function below, arguments "infoColl" and/or "rechits"
   // are allowed to be null.
   template <class DataFrame, class Collection>
@@ -329,7 +335,8 @@ private:
 // constructors and destructor
 //
 HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
-    : algoConfigClass_(conf.getParameter<std::string>("algoConfigClass")),
+    : dumpFile_(conf.getUntrackedParameter<std::string>("dumpFile", "")),
+      algoConfigClass_(conf.getParameter<std::string>("algoConfigClass")),
       processQIE8_(conf.getParameter<bool>("processQIE8")),
       processQIE11_(conf.getParameter<bool>("processQIE11")),
       saveInfos_(conf.getParameter<bool>("saveInfos")),
@@ -349,7 +356,8 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
       setPulseShapeFlagsQIE8_(conf.getParameter<bool>("setPulseShapeFlagsQIE8")),
       setPulseShapeFlagsQIE11_(conf.getParameter<bool>("setPulseShapeFlagsQIE11")),
       reco_(parseHBHEPhase1AlgoDescription(conf.getParameter<edm::ParameterSet>("algorithm"))),
-      negEFilter_(nullptr) {
+      negEFilter_(nullptr),
+      counter_(0) {
   // Check that the reco algorithm has been successfully configured
   if (!reco_.get())
     throw cms::Exception("HBHEPhase1BadConfig") << "Invalid HBHEPhase1Algo algorithm configuration" << std::endl;
@@ -383,11 +391,21 @@ HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
 
   if (makeRecHits_)
     produces<HBHERecHitCollection>();
+
+  // Open the dump file
+  if (!dumpFile_.empty()) {
+    dump_.open(dumpFile_);
+    if (!dump_.is_open()) {
+      std::cerr << "In HBHEPhase1Reconstructor constructor : failed to open dump file \""
+                << dumpFile_ << '"' << std::endl;
+    }
+  }
 }
 
 HBHEPhase1Reconstructor::~HBHEPhase1Reconstructor() {
   // do anything here that needs to be done at destruction time
   // (e.g. close files, deallocate resources etc.)
+  if (dump_.is_open()) dump_.close();
 }
 
 //
@@ -408,6 +426,7 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
   // Note that this flag affects only "infos", the rechits are still
   // not going to be constructed from such channels.
   const bool skipDroppedChannels = !(infos && saveDroppedInfos_);
+  const bool dumpInfos = dump_.is_open();
 
   // Iterate over the input collection
   for (typename Collection::const_iterator it = coll.begin(); it != coll.end(); ++it) {
@@ -543,6 +562,7 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
 
     // Reconstruct the rechit
     if (rechits && makeThisRechit) {
+      if (dumpInfos) {dump_ << *channelInfo << std::endl;}
       const HcalRecoParam* pptr = nullptr;
       if (recoParamsFromDB_)
         pptr = param_ts;
@@ -682,6 +702,8 @@ void HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& even
     e.put(std::move(infos));
   if (makeRecHits_)
     e.put(std::move(out));
+
+  ++counter_;
 }
 
 // ------------ method called when starting to processes a run  ------------
@@ -729,6 +751,7 @@ void HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& d
 
   desc.add<edm::InputTag>("digiLabelQIE8");
   desc.add<edm::InputTag>("digiLabelQIE11");
+  desc.addUntracked<std::string>("dumpFile");
   desc.add<std::string>("algoConfigClass");
   desc.add<bool>("processQIE8");
   desc.add<bool>("processQIE11");

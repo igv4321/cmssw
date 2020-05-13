@@ -9,6 +9,8 @@ import RecoLocalCalo.HcalRecProducers.HBHEStatusBitSetter_cfi as hbheStatusFlag
 hbheprereco = cms.EDProducer(
     "HBHEPhase1Reconstructor",
 
+    dumpFile = cms.untracked.string("HcalChannelInfos.txt"),
+    
     # Label for the input HBHEDigiCollection, and flag indicating
     # whether we should process this collection
     digiLabelQIE8 = cms.InputTag("hcalDigis"),

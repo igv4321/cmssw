@@ -6,6 +6,12 @@ namespace {
     s << ' ' << p;
     for (unsigned i=0; i<len; ++i) {s << ' ' << *arr++;}
   }
+
+  template <typename T>
+  void dumpArrayAsUnsigned(std::ostream& s, const char* p, const T* arr, const unsigned len) {
+    s << ' ' << p;
+    for (unsigned i=0; i<len; ++i) {s << ' ' << static_cast<unsigned>(*arr++);}
+  }
 }
 
 std::ostream& operator<<(std::ostream& s, const HBHEChannelInfo& inf) {
@@ -30,7 +36,7 @@ std::ostream& operator<<(std::ostream& s, const HBHEChannelInfo& inf) {
   dumpArray(s, "gain", inf.gain(), nSamples);
   dumpArray(s, "gainWidth", inf.gainWidth(), nSamples);
   dumpArray(s, "dFcPerADC", inf.dFcPerADC(), nSamples);
-  dumpArray(s, "adc", inf.adc(), nSamples);
+  dumpArrayAsUnsigned(s, "adc", inf.adc(), nSamples);
   if (inf.hasTimeInfo()) {dumpArray(s, "tdc", inf.riseTime(), nSamples);}
 
   return s;

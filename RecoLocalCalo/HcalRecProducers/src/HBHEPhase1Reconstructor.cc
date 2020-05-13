@@ -264,6 +264,7 @@ private:
 
   // Configuration parameters
   std::string dumpFile_;
+  unsigned dumpMax_;
   std::string algoConfigClass_;
   bool processQIE8_;
   bool processQIE11_;
@@ -341,6 +342,7 @@ private:
 //
 HBHEPhase1Reconstructor::HBHEPhase1Reconstructor(const edm::ParameterSet& conf)
     : dumpFile_(conf.getUntrackedParameter<std::string>("dumpFile", "")),
+      dumpMax_(conf.getUntrackedParameter<unsigned>("dumpMax", 10U)),
       algoConfigClass_(conf.getParameter<std::string>("algoConfigClass")),
       processQIE8_(conf.getParameter<bool>("processQIE8")),
       processQIE11_(conf.getParameter<bool>("processQIE11")),
@@ -431,7 +433,7 @@ void HBHEPhase1Reconstructor::processData(const Collection& coll,
   // Note that this flag affects only "infos", the rechits are still
   // not going to be constructed from such channels.
   const bool skipDroppedChannels = !(infos && saveDroppedInfos_);
-  const bool dumpInfos = dump_.is_open();
+  const bool dumpInfos = dump_.is_open() && counter_ < dumpMax_;
 
   const HcalTopology& htopo(*(paramTS_->topo()));
   std::array<HBHEPipelinePedestalAndGain, 4> pedsAndGains;
@@ -799,6 +801,7 @@ void HBHEPhase1Reconstructor::fillDescriptions(edm::ConfigurationDescriptions& d
   desc.add<edm::InputTag>("digiLabelQIE8");
   desc.add<edm::InputTag>("digiLabelQIE11");
   desc.addUntracked<std::string>("dumpFile");
+  desc.addUntracked<unsigned>("dumpMax");
   desc.add<std::string>("algoConfigClass");
   desc.add<bool>("processQIE8");
   desc.add<bool>("processQIE11");

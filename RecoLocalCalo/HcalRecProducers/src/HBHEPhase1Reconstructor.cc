@@ -702,7 +702,7 @@ void HBHEPhase1Reconstructor::produce(edm::Event& e, const edm::EventSetup& even
     out->reserve(maxOutputSize);
   }
 
-  if (dump_.is_open()) {
+  if (dump_.is_open() && counter_ < dumpMax_) {
       dump_ << "\nHBHEChannelInfo dump " << counter_ << std::endl;
   }
 
